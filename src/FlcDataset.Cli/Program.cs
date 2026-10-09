@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.CommandLine;
 using System.Diagnostics;
 using FlcDataset.Cli;
@@ -106,6 +107,18 @@ Option<int> WorkersOpt() => new("--workers") { Description = "Bounded worker cou
     var examples = new Option<int>("--examples") { DefaultValueFactory = _ => 5, Description = "Differing prompt pairs to print" };
     var cmd = new Command("semantic-compare", "Agreement of two semantic sidecars on common samples (engine/source regression check)") { a, b, policy, examples };
     cmd.SetAction(pr => Commands.SemanticCompare(pr.GetValue(a)!, pr.GetValue(b)!, pr.GetValue(policy)!, pr.GetValue(examples)));
+    root.Subcommands.Add(cmd);
+}
+
+// ---------------------------------------------------------------- semantic-redo
+{
+    var repo = new Option<string>("--repo") { Required = true, Description = "Checkout of the repository at the samples' revision" };
+    var cfg = new Option<string>("--config") { Required = true };
+    var samples = new Option<string>("--samples") { Required = true, Description = "flc-sample JSONL (.gz ok) of this repository to re-analyze" };
+    var outo = new Option<string>("--out") { Required = true, Description = "Output semantic JSONL" };
+    var workers = new Option<int>("--workers") { DefaultValueFactory = _ => 2 };
+    var cmd = new Command("semantic-redo", "Recompute semantic records (safe adhoc tier) for given samples, with the same discovery as extract") { repo, cfg, samples, outo, workers };
+    cmd.SetAction((pr, ct) => Commands.SemanticRedo(pr.GetValue(repo)!, pr.GetValue(cfg)!, pr.GetValue(samples)!, pr.GetValue(outo)!, pr.GetValue(workers), ct));
     root.Subcommands.Add(cmd);
 }
 
@@ -285,6 +298,50 @@ namespace FlcDataset.Cli
             var src = AdhocDocumentSource.Create(a.Repo, files);
             log.Info("semantic", "adhoc_workspace_created", src.Describe());
             return src;
+        }
+
+        /// <summary>
+        /// Re-analyzes the given samples of one repository with the current semantic code (safe adhoc source built from the
+        /// same discovery as extract). Samples whose file is not accepted any more or whose text changed are reported as
+        /// failed records with a reason, never dropped silently. Output order = input order (deterministic).
+        /// </summary>
+        public static async Task<int> SemanticRedo(string repoPath, string configPath, string samplesPath, string outPath, int workers, CancellationToken ct)
+        {
+            var config = DatasetConfig.Load(configPath);
+            config = config with { Semantic = config.Semantic with { SubsetFraction = 1.0 } };
+            var input = Jsonl.ReadLines(samplesPath).Where(l => l.Length > 0).Select(l => FlcJson.Deserialize<FlcSampleRecord>(l)!).ToList();
+            var repo = RepositoryInfo.Inspect(repoPath, config);
+            var discovered = new Discoverer(config, repo).Discover().Where(f => f.Document is not null).ToList();
+            using var source = AdhocDocumentSource.Create(repoPath, discovered.Select(f => (f.Record.RelativePath, f.Record.Project, f.Document!.Text)));
+            var byPath = discovered.ToDictionary(f => f.Record.RelativePath, StringComparer.Ordinal);
+            var enricher = new SemanticEnricher(source, config, "semantic_best_effort");
+            var results = new ConcurrentDictionary<string, List<SemanticRecord>>(StringComparer.Ordinal);
+            var counters = new Counters();
+            var latency = new LatencyRecorder();
+            await Parallel.ForEachAsync(input.GroupBy(s => s.RelativePath), new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, workers), CancellationToken = ct },
+                async (g, token) =>
+                {
+                    var list = g.ToList();
+                    if (!byPath.TryGetValue(g.Key, out var f) || f.Record.Sha256 != list[0].SourceSha256)
+                    {
+                        foreach (var s in list)
+                            results[s.SampleId] = [new SemanticRecord { SampleId = s.SampleId, VisibilityPolicy = VisibilityPolicy.EditorSnapshot,
+                                Status = SemanticStatus.Failed, Reason = byPath.ContainsKey(g.Key) ? "document_text_mismatch" : "document_not_in_workspace" }];
+                        return;
+                    }
+                    var fctx = new FileContext(s0(list).RepositoryId, s0(list).Revision, g.Key, f.Record.Project, f.Record.IsTest, s0(list).Split, s0(list).SplitGroup);
+                    var (_, recs) = await enricher.EnrichAsync(fctx, f.Document!, list, counters, latency, token);
+                    foreach (var r in recs.GroupBy(r => r.SampleId)) results[r.Key] = r.ToList();
+                });
+            static FlcSampleRecord s0(List<FlcSampleRecord> l) => l[0];
+            var tmp = outPath + ".tmp";
+            using (var w = new StreamWriter(tmp))
+                foreach (var s in input)
+                    if (results.TryGetValue(s.SampleId, out var recs))
+                        foreach (var r in recs) w.WriteLine(FlcJson.Serialize(r));
+            File.Move(tmp, outPath, overwrite: true);
+            Console.WriteLine(FlcJson.Serialize(new { samples = input.Count, records = results.Values.Sum(v => v.Count), counters = counters.Snapshot() }));
+            return 0;
         }
 
         public static int Validate(string dataset, string? repo)
