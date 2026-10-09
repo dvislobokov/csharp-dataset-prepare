@@ -1,5 +1,7 @@
 # Tokenizer study (C#)
 
+The trained tokenizers are in `tokenizers/` (see `tokenizers/README.md`).
+
 Script: `scripts/tokenizer_bench.py` (run on the server, 2026-10-09). Own byte-level BPE tokenizers were trained on the
 **train** split of the `corpus` config (400.1 MB, 59,615 files) and all tokenizers were evaluated
 on **held-out repositories** (validation/test splits: 40.4 MB, 3,585 files) plus
