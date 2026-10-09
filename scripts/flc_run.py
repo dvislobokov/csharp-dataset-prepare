@@ -837,9 +837,12 @@ def refresh_remote_files(api, args):
         return
     try:
         prefix = (args.path_prefix + "/") if args.path_prefix else ""
-        for f in api.list_repo_files(args.hf_repo, repo_type="dataset"):
-            if f.startswith(prefix + "data/"):
-                REMOTE_FILES.add(f[len(prefix):])
+        listed = [f[len(prefix):] for f in api.list_repo_files(args.hf_repo, repo_type="dataset") if f.startswith(prefix)]
+        # data/ only grows (files of the batch being staged are not remote yet); engine/ and tokenized/ are written by
+        # separate scripts and may be deleted, so they mirror the remote listing exactly
+        for f in [f for f in REMOTE_FILES if f.startswith(("engine/", "tokenized/"))]:
+            REMOTE_FILES.discard(f)
+        REMOTE_FILES.update(f for f in listed if f.startswith(("data/", "engine/", "tokenized/")))
     except Exception:  # noqa: BLE001
         pass
 
