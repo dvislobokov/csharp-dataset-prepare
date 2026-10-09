@@ -312,7 +312,22 @@ namespace FlcDataset.Cli
             var input = Jsonl.ReadLines(samplesPath).Where(l => l.Length > 0).Select(l => FlcJson.Deserialize<FlcSampleRecord>(l)!).ToList();
             var repo = RepositoryInfo.Inspect(repoPath, config);
             var discovered = new Discoverer(config, repo).Discover().Where(f => f.Document is not null).ToList();
-            using var source = AdhocDocumentSource.Create(repoPath, discovered.Select(f => (f.Record.RelativePath, f.Record.Project, f.Document!.Text)));
+            AdhocDocumentSource source;
+            try
+            {
+                source = AdhocDocumentSource.Create(repoPath, discovered.Select(f => (f.Record.RelativePath, f.Record.Project, f.Document!.Text)));
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Same contract as extract in best-effort mode: a workspace that cannot be built gives reason-coded records.
+                using (var w = new StreamWriter(outPath))
+                    foreach (var s in input)
+                        w.WriteLine(FlcJson.Serialize(new SemanticRecord { SampleId = s.SampleId, VisibilityPolicy = VisibilityPolicy.EditorSnapshot,
+                            Status = SemanticStatus.SyntaxFallback, Reason = "project_load" }));
+                Console.Error.WriteLine($"workspace_load_failed: {e.GetType().Name}: {e.Message}");
+                return 0;
+            }
+            using var _ = source;
             var byPath = discovered.ToDictionary(f => f.Record.RelativePath, StringComparer.Ordinal);
             var enricher = new SemanticEnricher(source, config, "semantic_best_effort");
             var results = new ConcurrentDictionary<string, List<SemanticRecord>>(StringComparer.Ordinal);

@@ -80,6 +80,27 @@ public class SemanticTests : IDisposable
     }
 
     [Fact]
+    public void DuplicateProjectReferenceDoesNotBreakTheWorkspace()
+    {
+        var dir = Directory.CreateTempSubdirectory("flc-dupref").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(dir, "A"));
+            Directory.CreateDirectory(Path.Combine(dir, "B"));
+            File.WriteAllText(Path.Combine(dir, "B/B.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+            File.WriteAllText(Path.Combine(dir, "A/A.csproj"), """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <ItemGroup Condition="'$(X)' == ''"><ProjectReference Include="../B/B.csproj" /></ItemGroup>
+                  <ItemGroup Condition="'$(X)' != ''"><ProjectReference Include="..\B\B.csproj" /></ItemGroup>
+                </Project>
+                """);
+            using var src = AdhocDocumentSource.Create(dir, [("A/C.cs", "A/A.csproj", "class C { B.D d; }"), ("B/D.cs", "B/B.csproj", "namespace B; public class D {}")]);
+            Assert.NotNull(src.Find("A/C.cs", out _));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public async Task VarTypeIsResolvedFromInference()
     {
         var caret = TestUtil.After(_service.Text, "int count", atStart: true);

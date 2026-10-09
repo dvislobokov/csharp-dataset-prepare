@@ -205,7 +205,9 @@ public sealed class AdhocDocumentSource : DocumentSourceBase
                         var inc = pr.Attribute("Include")?.Value.Replace('\\', '/');
                         if (inc is null) continue;
                         var target = Path.GetRelativePath(src.Root, Path.GetFullPath(Path.Combine(Path.GetDirectoryName(projFull)!, inc))).Replace('\\', '/');
-                        if (ids.TryGetValue(target, out var pid) && target != g.Key) projectRefs.Add(new ProjectReference(pid));
+                        // A csproj may list the same reference twice (e.g. under two conditions); Roslyn rejects duplicates.
+                        if (ids.TryGetValue(target, out var pid) && target != g.Key && projectRefs.All(r => r.ProjectId != pid))
+                            projectRefs.Add(new ProjectReference(pid));
                     }
                 }
                 catch (System.Xml.XmlException e) { src.Diagnostics.Add($"csproj_xml_error {g.Key}: {e.Message}"); }
