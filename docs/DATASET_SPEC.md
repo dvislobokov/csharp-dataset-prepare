@@ -62,6 +62,10 @@ Keyed by `(sample_id, visibility_policy)`. Status ∈ `resolved | partially_reso
 * `locals`, `parameters` (incl. `primary_ctor_parameter`, `lambda_parameter`), `this_members` — usable at the caret.
 * `receiver_type`/`receiver_kind`/`members` after `.`/`?.`/qualified names; accessible members only, overloads grouped.
 * `invocation_candidates` inside `(`/`,` of a call: every overload applicable to the argument index, never a single guess.
+* `context_types`: contracts of nearby project types (`name`, `kind`, `source` ∈ local/parameter/member/base/prefix,
+  `members`, `total_members`), selected from scope/prefix facts only — see PROMPT_FORMAT.md.
+* `context_types`: contracts of nearby project types (`name`, `kind`, `source` ∈ local/parameter/member/base/prefix,
+  `members`, `total_members`), selected from scope/prefix facts only — see PROMPT_FORMAT.md.
 * `expected_type` + `expected_type_source` only when bound (argument with a single parameter type, `return`, assignment,
   typed initializer, expression body, condition).
 * Type names are minimal display strings valid at the caret line; identifiers are escaped (`@event`).

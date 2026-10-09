@@ -107,8 +107,12 @@ public class SemanticTests : IDisposable
         // `total += line.Price * line.Quantity;` — Price/Quantity appear only in the hidden target in this file.
         var caret = TestUtil.After(_service.Text, "total += line", atStart: true);
         var r = await At(caret);
-        Assert.DoesNotContain("Quantity", r.Prompt);
-        Assert.DoesNotContain("Price", r.Prompt);
+        // Not copied into scope facts from the hidden line...
+        var withoutTypes = SemanticAnalyzer.RenderPrompt(r with { ContextTypes = [] });
+        Assert.DoesNotContain("Quantity", withoutTypes);
+        Assert.DoesNotContain("Price", withoutTypes);
+        // ...but legitimately listed as members of the local's type OrderLine, which exist independently of the target.
+        Assert.Contains(r.ContextTypes, t => t.Name == "OrderLine" && t.Source == "local" && t.Members.Any(m => m.Name == "Quantity"));
         Assert.Contains(r.Locals, l => l.Name == "line" && l.Type == "OrderLine");
         Assert.Contains(r.Locals, l => l.Name == "total");
         Assert.Empty(r.Leakage!.Violations);
@@ -284,5 +288,69 @@ public class BeingTypedTests
             Assert.DoesNotContain(r.Locals, l => l.Name == partial);
             Assert.Contains(r.Parameters, p => p.Name == "map");
         }
+    }
+}
+
+public class ContextTypeTests
+{
+    const string Code = """
+        namespace Shop2;
+        public sealed class Customer { public string Name { get; set; } = ""; public int Orders { get; set; } public void Rename(string name) { } }
+        public sealed class Invoice { public Invoice(int number) { Number = number; } public int Number { get; } public decimal Total() => 0m; }
+        public interface IClock { System.DateTime Now(); }
+        public class Billing(IClock clock)
+        {
+            public void Run(Customer customer)
+            {
+                var name = customer.Name;
+                var inv = new Invoice(42);
+            }
+        }
+        """;
+
+    static async Task<SemanticRecord> At(string marker, bool atStart, string engine = "auto")
+    {
+        var doc = SourceDocument.FromText(Code);
+        using var src = AdhocDocumentSource.Create(TestUtil.FixtureRepo, [("src/Billing.cs", null, Code)]);
+        var caret = TestUtil.After(Code, marker, atStart);
+        return await SemanticAnalyzer.AnalyzeAsync(src.Find("src/Billing.cs", out _)!, TestUtil.SampleAt(doc, "src/Billing.cs", caret),
+            VisibilityPolicy.EditorSnapshot, new SemanticConfig { Engine = engine }, TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("fork")]
+    public async Task TypesOfInScopeSymbolsAreListedWithMembers(string engine)
+    {
+        var r = await At("var inv", atStart: true, engine);
+        var customer = r.ContextTypes.Single(t => t.Name == "Customer");
+        Assert.Equal("parameter", customer.Source);
+        Assert.Contains(customer.Members, m => m.Name == "Rename");
+        Assert.Contains(customer.Members, m => m.Name == "Orders");
+        var clock = r.ContextTypes.Single(t => t.Name == "IClock");
+        Assert.Contains(clock.Members, m => m.Name == "Now");
+        Assert.Contains("TYPE Customer:", r.Prompt);
+        // Invoice is used only inside the hidden target line: it must not be selected.
+        Assert.DoesNotContain(r.ContextTypes, t => t.Name == "Invoice");
+        Assert.Empty(r.Leakage!.Violations);
+    }
+
+    [Fact]
+    public async Task TypeNamedInVisiblePrefixIsListedWithConstructor()
+    {
+        var r = await At("new Invoice(", atStart: false);
+        var inv = r.ContextTypes.Single(t => t.Name == "Invoice");
+        Assert.Equal("prefix", inv.Source);
+        Assert.Contains(inv.Members, m => m.Kind == "constructor" && m.Signature == "new(int number)");
+    }
+
+    [Fact]
+    public async Task BlockCanBeDisabled()
+    {
+        var doc = SourceDocument.FromText(Code);
+        using var src = AdhocDocumentSource.Create(TestUtil.FixtureRepo, [("src/Billing.cs", null, Code)]);
+        var r = await SemanticAnalyzer.AnalyzeAsync(src.Find("src/Billing.cs", out _)!, TestUtil.SampleAt(doc, "src/Billing.cs", TestUtil.After(Code, "var inv", true)),
+            VisibilityPolicy.EditorSnapshot, new SemanticConfig { MaxContextTypes = 0 }, TestContext.Current.CancellationToken);
+        Assert.Empty(r.ContextTypes);
     }
 }

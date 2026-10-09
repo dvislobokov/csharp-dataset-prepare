@@ -340,6 +340,8 @@ These refine or deviate from the proposals above; docs and tests were updated ac
   holds unit and integration tests. Pilot checkout lives at `data/repos/eShop` (ignored), not `workspaces/`.
 - **Target convention:** target = rest of the physical line after the caret **excluding trailing whitespace** (which starts
   `right_context`). Indentation before a `line_start` caret counts as typed. See `docs/DATASET_SPEC.md`.
+- **Prompt format v2:** `flc-prompt/v2` adds `TYPE` lines (contracts of nearby project types, selected from scope/prefix facts
+  only; `semantic.context_types`); `render --no-types` keeps the v1 layout. Measured in `docs/BENCHMARKS.md`.
 - **Stop token:** dedicated `<|eol|>` (not `\n`) in `flc-prompt/v1` (`docs/PROMPT_FORMAT.md`); multi-line reserves
   `<|end_completion|>`. Canonical records never store a preformatted prompt; `render` produces model records.
 - **Schemas:** `flc-sample/v1`, `corpus-file/v1`, `flc-semantic/v1` (sidecar), `run-manifest/v1` under `schemas/`.

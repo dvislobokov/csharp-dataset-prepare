@@ -135,6 +135,8 @@ public static class SemanticAnalyzer
         bool InPrefix(string name) => ctx.OccursIn(name.TrimStart('@'), Math.Max(0, pos - 20000), pos);
 
         var declaredHere = new HashSet<string>(StringComparer.Ordinal);
+        // Seeds for the TYPE block: types of facts already derived from the snapshot/prefix (never from the target).
+        var typeSeeds = new List<(ITypeSymbol Type, string Source)>();
         int artifacts = 0;
         var locals = new List<SymbolFact>();
         var parameters = new List<SymbolFact>();
@@ -185,6 +187,7 @@ public static class SemanticAnalyzer
                             // Locals of earlier top-level statements live in the original tree (text before the caret is identical).
                             var (lt, ann) = LocalType(decl.SyntaxTree == ctx.Tree && decl.SyntaxTree != b.SnapshotTree ? ctx.Model : model, l, decl.GetSyntax(ct), ct);
                             locals.Add(new SymbolFact { Name = Esc(l.Name), Kind = l.IsConst ? "const" : "local", Type = Min(lt), NullableAnnotation = ann });
+                            typeSeeds.Add((lt, "local"));
                             declaredHere.Add(l.Name);
                             break;
                         }
@@ -209,6 +212,7 @@ public static class SemanticAnalyzer
                                 Type = Min(p.Type), NullableAnnotation = Ann(p.Type),
                             });
                             if (p.DeclaringSyntaxReferences.Any(r => IsThisDocument(r.SyntaxTree))) declaredHere.Add(p.Name);
+                            typeSeeds.Add((p.Type, "parameter"));
                             break;
                         }
                     }
@@ -238,6 +242,10 @@ public static class SemanticAnalyzer
                 .Select(x => GroupFact(x.Value.Symbols, CMin, CSig)).ToList();
             foreach (var (name, g) in groups)
                 if (g.Symbols.Any(s => s.DeclaringSyntaxReferences.Any(r => IsThisDocument(r.SyntaxTree)))) declaredHere.Add(name);
+            foreach (var g in groups.Values)
+                foreach (var s in g.Symbols)
+                    if (s is IFieldSymbol f) typeSeeds.Add((f.Type, "member"));
+                    else if (s is IPropertySymbol pr) typeSeeds.Add((pr.Type, "member"));
             truncated = locals.Count >= cfg.MaxScopeSymbols || groups.Count > cfg.MaxThisMembers;
         }
 
@@ -350,6 +358,110 @@ public static class SemanticAnalyzer
             }
         }
 
+        ct.ThrowIfCancellationRequested();
+        List<TypeContract> contextTypes;
+        using (SemanticProfile.Measure("types." + b.Engine))
+            contextTypes = ContextTypes();
+
+        // TYPE block: contracts of nearby project types. Candidates come only from facts above (in-scope symbol types), base types
+        // of the enclosing type and type names already typed in the visible prefix; the receiver/enclosing types are excluded
+        // because MEMBER/THIS already cover them. Every accessible member is eligible (capped), not just the one the target uses.
+        List<TypeContract> ContextTypes()
+        {
+            if (cfg.MaxContextTypes <= 0) return [];
+            if (containingType is not null)
+            {
+                if (containingType.BaseType is { } bt) typeSeeds.Add((bt, "base"));
+                foreach (var i in containingType.Interfaces) typeSeeds.Add((i, "base"));
+            }
+            // Type names in the visible prefix of the current member (bounded window), resolved at the caret's scope.
+            // Window = the enclosing member's text before the caret (from the original tree, identical before the caret for every engine).
+            var memberNode = ctx.Root.FindToken(Math.Max(0, pos - 1)).Parent?.AncestorsAndSelf()
+                .LastOrDefault(n => n is MemberDeclarationSyntax and not (BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax) || n is GlobalStatementSyntax);
+            int windowStart = Math.Max(Math.Max(0, pos - 3000), memberNode?.SpanStart ?? pos);
+            foreach (var name in ctx.IdentifiersIn(windowStart, pos))
+            {
+                if (name.Length < 2 || !char.IsUpper(name[0])) continue;
+                foreach (var t in model.LookupNamespacesAndTypes(displayPos, name: name).OfType<INamedTypeSymbol>())
+                    typeSeeds.Add((t, "prefix"));
+            }
+
+            int SourceRank(string s) => s switch { "local" or "parameter" => 0, "member" => 1, "prefix" => 2, _ => 3 };
+            var picked = new Dictionary<INamedTypeSymbol, string>(SymbolEqualityComparer.Default);
+            foreach (var (seed, source) in typeSeeds)
+                foreach (var t in Expand(seed))
+                {
+                    if (!Eligible(t)) continue;
+                    if (!picked.TryGetValue(t, out var existing) || SourceRank(source) < SourceRank(existing)) picked[t] = source;
+                }
+
+            bool Eligible(INamedTypeSymbol t)
+            {
+                if (t.TypeKind is not (TypeKind.Class or TypeKind.Interface or TypeKind.Struct or TypeKind.Enum)) return false;
+                if (t.SpecialType != SpecialType.None || t.IsImplicitlyDeclared || t.IsAnonymousType) return false;
+                if (!cfg.ContextTypesIncludeMetadata && !t.Locations.Any(l => l.IsInSource)) return false;
+                if (containingType is not null && SymbolEqualityComparer.Default.Equals(t.OriginalDefinition, containingType.OriginalDefinition)) return false;
+                if (receiverType is not null && receiverKind is "instance" or "type" && Min(t) == receiverType) return false;
+                return !LaterInDoc(t) && !EditedDeclaration(t);
+            }
+
+            var result = new List<TypeContract>();
+            foreach (var (t, source) in picked.OrderBy(x => SourceRank(x.Value)).ThenBy(x => InPrefix(x.Key.Name) ? 0 : 1)
+                         .ThenBy(x => x.Key.Name, StringComparer.Ordinal).ThenBy(x => Min(x.Key), StringComparer.Ordinal).Take(cfg.MaxContextTypes))
+            {
+                var groups = new Dictionary<string, List<ISymbol>>(StringComparer.Ordinal);
+                foreach (var s in Members(t, false))
+                {
+                    if (s.IsImplicitlyDeclared || s is INamedTypeSymbol) continue;
+                    if (s is not (IFieldSymbol or IPropertySymbol or IMethodSymbol or IEventSymbol)) continue;
+                    if (s is IMethodSymbol { MethodKind: not MethodKind.Ordinary }) continue;
+                    if (ObjectMembers.Contains(s.Name) && s.ContainingType?.SpecialType == SpecialType.System_Object) continue;
+                    if (Artifact(s)) continue;
+                    (groups.TryGetValue(s.Name, out var l) ? l : groups[s.Name] = []).Add(s);
+                }
+                var ctors = t.TypeKind is TypeKind.Class or TypeKind.Struct && !t.IsAbstract && !t.IsStatic
+                    ? t.InstanceConstructors.Where(c => !c.IsImplicitlyDeclared && model.IsAccessible(displayPos, c) && !Artifact(c)).ToList() : [];
+                var facts = new List<SymbolFact>();
+                if (ctors.Count > 0)
+                {
+                    var rep = ctors.OrderBy(c => c.Parameters.Length).ThenBy(CSig, StringComparer.Ordinal).First();
+                    facts.Add(new SymbolFact { Name = "new", Kind = "constructor", Signature = CtorSig(rep), Overloads = ctors.Count });
+                }
+                // Project-declared members before ones inherited from libraries (e.g. DbContext's ChangeTracker).
+                static int Origin(List<ISymbol> g) => g.Any(m => m.Locations.Any(l => l.IsInSource)) ? 0 : 1;
+                facts.AddRange(groups.OrderBy(x => InPrefix(x.Key) ? 0 : 1).ThenBy(x => Origin(x.Value)).ThenBy(x => KindOrder(KindOf(x.Value[0]))).ThenBy(x => x.Key, StringComparer.Ordinal)
+                    .Take(Math.Max(0, cfg.MaxTypeMembers - facts.Count)).Select(x => GroupFact(x.Value, CMin, CSig)));
+                result.Add(new TypeContract
+                {
+                    Name = CMin(t), Kind = t.IsRecord ? "record" : t.TypeKind.ToString().ToLowerInvariant(), Source = source, IsStatic = t.IsStatic,
+                    Members = facts, TotalMembers = groups.Count + (ctors.Count > 0 ? 1 : 0),
+                });
+            }
+            return result;
+
+            string CtorSig(IMethodSymbol c) => "new(" + string.Join(", ", c.Parameters.Select(p => CMin(p.Type) + " " + Esc(p.Name))) + ")";
+        }
+
+        static IEnumerable<INamedTypeSymbol> Expand(ITypeSymbol t)
+        {
+            switch (t)
+            {
+                case IArrayTypeSymbol a:
+                    foreach (var x in Expand(a.ElementType)) yield return x;
+                    break;
+                case INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } n:
+                    foreach (var x in Expand(n.TypeArguments[0])) yield return x;
+                    break;
+                case INamedTypeSymbol n:
+                    yield return n;
+                    // Generic arguments (Task<Order>, List<OrderItem>, IRepository<Order>) usually carry the project types.
+                    foreach (var arg in n.TypeArguments)
+                        if (arg is INamedTypeSymbol na && !na.IsGenericType) yield return na;
+                        else if (arg is IArrayTypeSymbol { ElementType: INamedTypeSymbol ae }) yield return ae;
+                    break;
+            }
+        }
+
         string status;
         if (enclosing is null) { status = SemanticStatus.PartiallyResolved; reason ??= "no_enclosing_symbol"; }
         else if (receiverExpr is not null && receiverType is null) status = SemanticStatus.PartiallyResolved;
@@ -379,6 +491,7 @@ public static class SemanticAnalyzer
                 ReceiverKind = receiverKind,
                 Members = members,
                 InvocationCandidates = candidates,
+                ContextTypes = contextTypes,
                 SnapshotSyntaxErrors = b.ParseErrors,
                 SyntheticSuffix = b.SyntheticSuffix,
                 Truncated = truncated,
@@ -974,6 +1087,8 @@ public static class SemanticAnalyzer
         if (r.ThisMembers.Count > 0) sb.Append("THIS ").Append(string.Join("; ", r.ThisMembers.Select(FactText))).Append('\n');
         if (r.ReceiverType is not null) sb.Append("RECV ").Append(r.ReceiverType).Append(" (").Append(r.ReceiverKind).Append(")\n");
         if (r.Members.Count > 0) sb.Append("MEM ").Append(string.Join("; ", r.Members.Select(FactText))).Append('\n');
+        foreach (var t in r.ContextTypes)
+            sb.Append("TYPE ").Append(t.Name).Append(": ").Append(string.Join("; ", t.Members.Select(FactText))).Append('\n');
         if (r.InvocationCandidates.Count > 0)
             sb.Append("CALL ").Append(string.Join(" | ", r.InvocationCandidates.Select(c => $"{c.Signature} @{c.ArgumentIndex}" + (c.ParameterName is null ? "" : $" {c.ParameterName}:{c.ParameterType}")))).Append('\n');
         return sb.ToString();
@@ -982,6 +1097,7 @@ public static class SemanticAnalyzer
     static string FactText(SymbolFact f) => f.Kind switch
     {
         "method" => (f.Signature ?? f.Name) + (f.Overloads > 1 ? $" (+{f.Overloads - 1})" : ""),
+        "constructor" => (f.Signature ?? "new()") + (f.Overloads > 1 ? $" (+{f.Overloads - 1})" : ""),
         "type" or "namespace" => f.Name,
         _ => $"{f.Name}:{f.Type}",
     };

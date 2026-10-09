@@ -87,10 +87,12 @@ Option<int> WorkersOpt() => new("--workers") { Description = "Bounded worker cou
     var policy = new Option<string>("--policy") { DefaultValueFactory = _ => "editor_snapshot", Description = "Which semantic visibility policy to render" };
     policy.AcceptOnlyFromAmong("editor_snapshot", "strict_prefix");
     var preview = new Option<int>("--preview") { DefaultValueFactory = _ => 100, Description = "Examples written to preview.md for manual inspection" };
-    var cmd = new Command("render", "Serialize samples into flc-prompt/v1 training records (prompt + completion with <|eol|>)") { ds, outo, maxCode, maxSem, policy, preview };
+    var noTypes = new Option<bool>("--no-types") { Description = "Omit TYPE lines (flc-prompt/v1 layout)" };
+    var cmd = new Command("render", "Serialize samples into flc-prompt/v2 training records (prompt + completion with <|eol|>)") { ds, outo, maxCode, maxSem, policy, preview, noTypes };
     cmd.SetAction(pr => Commands.Render(pr.GetValue(ds)!, pr.GetValue(outo)!, new PromptOptions
     {
         MaxCodeChars = pr.GetValue(maxCode), MaxSemanticChars = pr.GetValue(maxSem), Policy = pr.GetValue(policy)!,
+        IncludeTypes = !pr.GetValue(noTypes), Format = pr.GetValue(noTypes) ? PromptRenderer.FormatV1 : PromptRenderer.FormatV2,
     }, pr.GetValue(preview)));
     root.Subcommands.Add(cmd);
 }
@@ -354,7 +356,7 @@ namespace FlcDataset.Cli
                 ["note"] = "Budgets are in UTF-16 chars; no tokenizer is pinned yet, so token counts are not reported.",
             };
             File.WriteAllText(Path.Combine(outDir, "render-summary.json"), FlcJson.Serialize(summary, indented: true) + "\n");
-            var md = new System.Text.StringBuilder("# flc-prompt/v1 preview\n\nSpecial tokens are shown literally. Loss applies to COMPLETION only.\n\n");
+            var md = new System.Text.StringBuilder($"# {o.Format} preview\n\nSpecial tokens are shown literally. Loss applies to COMPLETION only.\n\n");
             foreach (var (_, s, t) in preview.OrderBy(x => x.Key).Take(previewCount))
             {
                 md.Append($"## {s.CaretKind}/{s.CaretSubkind} · `{s.RelativePath}:{s.CaretLineZeroBased + 1}:{s.CaretColumnUtf16ZeroBased + 1}` · semantic={s.SemanticStatus}\n\n");

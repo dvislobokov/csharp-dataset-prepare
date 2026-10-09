@@ -152,3 +152,24 @@ public class PromptRendererTests
     [InlineData("void Run()", "Run()->void")]
     public void CompactSignature(string input, string expected) => Assert.Equal(expected, PromptRenderer.CompactSig(input));
 }
+
+public class TypeBlockRenderTests
+{
+    [Fact]
+    public void TypeLinesRenderAndCanBeDisabled()
+    {
+        var s = TestUtil.SampleAt(SourceDocument.FromText("class A { void M(Customer c) { var x = \n}"), "src/A.cs", 39);
+        var sem = new SemanticRecord
+        {
+            SampleId = s.SampleId, VisibilityPolicy = VisibilityPolicy.EditorSnapshot, Status = SemanticStatus.Resolved,
+            ContextTypes = [new TypeContract { Name = "Customer", Kind = "class", Source = "parameter", Members =
+                [new SymbolFact { Name = "new", Kind = "constructor", Signature = "new(string name)" }, new SymbolFact { Name = "Name", Kind = "property", Type = "string" },
+                 new SymbolFact { Name = "Rename", Kind = "method", Signature = "void Rename(string name)" }] }],
+        };
+        var v2 = PromptRenderer.Render(s, sem, new PromptOptions());
+        Assert.Contains("TYPE Customer: new(string name); Name:string; Rename(string name)->void\n", v2.Prompt);
+        Assert.Equal("flc-prompt/v2", v2.PromptFormat);
+        var v1 = PromptRenderer.Render(s, sem, new PromptOptions { IncludeTypes = false, Format = PromptRenderer.FormatV1 });
+        Assert.DoesNotContain("TYPE ", v1.Prompt);
+    }
+}

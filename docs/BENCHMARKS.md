@@ -142,3 +142,25 @@ processes on the same 16-thread laptop, each running full E3 on eShop:
 
 (8 physical cores / 16 threads; the MSBuild BuildHost exits after workspace load and is not in these numbers.) Operating model
 for large runs: one process per repository with 1–2 workers, concurrency bounded by a per-job memory budget.
+
+## TYPE block study (flc-prompt/v2, 2026-10-09)
+
+20% deterministic sample subset per repository; eShop with the trusted MSBuild source, the other five with the safe adhoc
+source. "Coverage" = share of identifiers of the hidden target (string literals removed, keywords excluded) that appear in the
+**rendered** `<|sem|>` block of samples that have one, i.e. after the char budget is applied (`artifacts/types/measure.py`).
+
+| Repository | v1, 900 chars | v2 (TYPE), 900 | v1, 1500 | v2 (TYPE), 1500 | semantic CPU, TYPE vs none |
+|---|---|---|---|---|---|
+| eShop | 0.399 | 0.448 | 0.416 | **0.489** | +24% |
+| Polly | 0.420 | 0.426 | 0.426 | **0.462** | +21% |
+| CleanArchitecture | 0.355 | 0.426 | 0.355 | **0.429** | +15% |
+| ILSpy | 0.441 | 0.469 | 0.457 | **0.500** | +14% |
+| unity-mcp | 0.410 | 0.453 | 0.419 | **0.474** | −2% (noise) |
+| LiteDB | 0.430 | 0.484 | 0.444 | **0.523** | +16% |
+
+Mean rendered semantic block: +100–140 chars at a 900 budget, +250–370 chars at 1500. Gains are largest after operators and
+keywords, in argument lists and LINQ (eShop 1500: after_operator 0.46→0.58, after_keyword 0.47→0.61, linq 0.43→0.57,
+argument_list 0.51→0.61) and on line starts (0.38→0.45). Leakage validation stayed clean (0 violations; 3,894 eShop and
+45,888 LiteDB semantic records). Members declared in the repository rank before inherited library members (e.g. a
+`DbContext` subclass shows its `DbSet` properties before `ChangeTracker`). Coverage is an upper-bound helpfulness proxy, not
+model accuracy; the final budget should be chosen in tokens once a tokenizer is pinned.

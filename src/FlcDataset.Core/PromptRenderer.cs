@@ -5,7 +5,9 @@ namespace FlcDataset.Core;
 /// <summary>Training/inference serialization options. Budgets are in UTF-16 chars until a tokenizer is pinned.</summary>
 public sealed record PromptOptions
 {
-    public string Format { get; init; } = PromptRenderer.FormatV1;
+    public string Format { get; init; } = PromptRenderer.FormatV2;
+    /// <summary>Render TYPE lines (contracts of nearby project types). false reproduces flc-prompt/v1.</summary>
+    public bool IncludeTypes { get; init; } = true;
     public int MaxCodeChars { get; init; } = 4000;
     public int MaxSemanticChars { get; init; } = 900;
     public bool IncludePath { get; init; } = true;
@@ -46,6 +48,8 @@ public sealed record TrainingRecord
 public static class PromptRenderer
 {
     public const string FormatV1 = "flc-prompt/v1";
+    /// <summary>v1 + TYPE lines.</summary>
+    public const string FormatV2 = "flc-prompt/v2";
     public const string Cs = "<|cs|>", Path = "<|path|>", Sem = "<|sem|>", Code = "<|code|>", Complete = "<|complete|>", Eol = "<|eol|>";
     public static readonly string[] SpecialTokens = [Cs, Path, Sem, Code, Complete, Eol, "<|end_completion|>", "<|eos|>"];
 
@@ -88,8 +92,8 @@ public static class PromptRenderer
     /// </summary>
     public static (string Text, int Dropped) RenderSemantic(SemanticRecord r, PromptOptions o)
     {
-        var lines = new List<(int Order, int Priority, string Key, List<string> Items, string Sep)>();
-        void Add(int order, int prio, string key, IEnumerable<string> items, string sep = " ")
+        var lines = new List<(double Order, int Priority, string Key, List<string> Items, string Sep)>();
+        void Add(double order, int prio, string key, IEnumerable<string> items, string sep = " ")
         {
             var list = items.Where(x => !string.IsNullOrEmpty(x)).ToList();
             if (list.Count > 0) lines.Add((order, prio, key, list, sep));
@@ -101,13 +105,20 @@ public static class PromptRenderer
         Add(3, 4, "LOCAL", r.Locals.Select(l => l.Type is null ? l.Name : $"{l.Name}:{l.Type}"));
         Add(4, 7, "FIELD", r.ThisMembers.Where(m => m.Kind is "field" or "const" or "event").Select(m => $"{m.Name}:{m.Type}"));
         Add(5, 7, "PROPERTY", r.ThisMembers.Where(m => m.Kind == "property").Select(m => $"{m.Name}:{m.Type}"));
-        Add(6, 8, "METHOD", r.ThisMembers.Where(m => m.Kind == "method").Select(Compact), "; ");
+        Add(6, 9, "METHOD", r.ThisMembers.Where(m => m.Kind == "method").Select(Compact), "; ");
         Add(7, 1, "RECV", r.ReceiverType is null ? [] : [r.ReceiverKind is "type" or "namespace" ? $"{r.ReceiverKind} {r.ReceiverType}" : r.ReceiverType]);
         Add(8, 6, "MEMBER", r.Members.Select(Compact), "; ");
+        if (o.IncludeTypes)
+            for (int i = 0; i < r.ContextTypes.Count; i++)
+            {
+                var t = r.ContextTypes[i];
+                // One line per type; earlier (more relevant) types win the budget first.
+                Add(8.5 + i * 0.01, 8, $"TYPE {t.Name}:", t.Members.Select(Compact), "; ");
+            }
         Add(9, 2, "CALL", r.InvocationCandidates.Select(c => CompactSig(c.Signature) + $" @{c.ArgumentIndex}" + (c.ParameterName is null ? "" : $" {c.ParameterName}:{c.ParameterType}")), " | ");
 
         int budget = o.MaxSemanticChars, dropped = 0;
-        var admitted = new List<(int Order, string Text)>();
+        var admitted = new List<(double Order, string Text)>();
         foreach (var l in lines.OrderBy(l => l.Priority))
         {
             var items = l.Items.Take(o.MaxItemsPerLine).ToList();
@@ -125,6 +136,7 @@ public static class PromptRenderer
     static string Compact(SymbolFact f) => f.Kind switch
     {
         "method" => CompactSig(f.Signature ?? f.Name) + (f.Overloads > 1 ? $" +{f.Overloads - 1}" : ""),
+        "constructor" => (f.Signature ?? "new()") + (f.Overloads > 1 ? $" +{f.Overloads - 1}" : ""),
         "type" or "namespace" => f.Name,
         _ => $"{f.Name}:{f.Type}",
     };

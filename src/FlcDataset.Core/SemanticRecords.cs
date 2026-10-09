@@ -30,6 +30,18 @@ public sealed record SymbolFact
     public bool IsExtension { get; init; }
 }
 
+/// <summary>Contract of a nearby project type (type of an in-scope symbol, a base type, or a type named in the prefix).</summary>
+public sealed record TypeContract
+{
+    public required string Name { get; init; }
+    public required string Kind { get; init; }
+    /// <summary>Why it was selected: local, parameter, member, base, prefix.</summary>
+    public required string Source { get; init; }
+    public bool IsStatic { get; init; }
+    public List<SymbolFact> Members { get; init; } = [];
+    public int TotalMembers { get; init; }
+}
+
 public sealed record InvocationCandidate
 {
     public required string Signature { get; init; }
@@ -71,6 +83,8 @@ public sealed record SemanticRecord
     public string? ReceiverKind { get; init; }
     public List<SymbolFact> Members { get; init; } = [];
     public List<InvocationCandidate> InvocationCandidates { get; init; } = [];
+    /// <summary>Contracts of nearby project types (members accessible at the caret), selected from scope/prefix only.</summary>
+    public List<TypeContract> ContextTypes { get; init; } = [];
     public int SnapshotSyntaxErrors { get; init; }
     /// <summary>strict_prefix only: synthetic closing braces derived from the prefix alone (never from text after the caret).</summary>
     public string? SyntheticSuffix { get; init; }

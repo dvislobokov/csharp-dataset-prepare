@@ -60,6 +60,10 @@ public sealed class FileSemanticContext
         return null;
     });
 
+    /// <summary>Distinct identifier names with an occurrence in [start, end), ordinal order.</summary>
+    public IEnumerable<string> IdentifiersIn(int start, int end) =>
+        _identifierPositions.Keys.Where(n => OccursIn(n, start, end)).Order(StringComparer.Ordinal);
+
     /// <summary>True when an identifier token with this name starts in [start, end).</summary>
     public bool OccursIn(string name, int start, int end)
     {

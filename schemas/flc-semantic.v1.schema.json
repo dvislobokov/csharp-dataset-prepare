@@ -1,50 +1,316 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://flc-dataset.local/schemas/flc-semantic.v1.schema.json",
-  "title": "flc-semantic/v1 — semantic facts at a caret (sidecar keyed by sample_id + visibility_policy)",
+  "title": "flc-semantic/v1 \u2014 semantic facts at a caret (sidecar keyed by sample_id + visibility_policy)",
   "description": "Facts are computed on a snapshot with the hidden target removed (editor_snapshot) or on the prefix only (strict_prefix). Type names are minimal display strings valid at the caret. nullable_annotation is the declared annotation, not flow state.",
   "type": "object",
   "additionalProperties": false,
   "$defs": {
     "fact": {
-      "type": "object", "additionalProperties": false, "required": ["name","kind"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind"
+      ],
       "properties": {
-        "name": { "type": "string" }, "kind": { "type": "string" }, "type": { "type": ["string","null"] },
-        "nullable_annotation": { "enum": ["annotated","not_annotated","none", null] },
-        "signature": { "type": ["string","null"] }, "is_static": { "type": "boolean" },
-        "overloads": { "type": "integer", "minimum": 1 }, "is_extension": { "type": "boolean" }
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nullable_annotation": {
+          "enum": [
+            "annotated",
+            "not_annotated",
+            "none",
+            null
+          ]
+        },
+        "signature": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_static": {
+          "type": "boolean"
+        },
+        "overloads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "is_extension": {
+          "type": "boolean"
+        }
       }
     }
   },
-  "required": ["schema_version","sample_id","visibility_policy","status","reason"],
+  "required": [
+    "schema_version",
+    "sample_id",
+    "visibility_policy",
+    "status",
+    "reason"
+  ],
   "properties": {
-    "schema_version": { "const": "flc-semantic/v1" },
-    "sample_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
-    "visibility_policy": { "enum": ["editor_snapshot","strict_prefix"] },
-    "analysis_engine": { "enum": ["speculative","speculative_scope","statement_scope","fork","fork_after_speculative_error", null] },
-    "status": { "enum": ["resolved","partially_resolved","syntax_fallback","failed"] },
-    "reason": { "type": ["string","null"] },
-    "project": { "type": ["string","null"] },
-    "enclosing_symbol": { "type": ["string","null"] },
-    "enclosing_kind": { "type": ["string","null"] },
-    "enclosing_type": { "type": ["string","null"] },
-    "return_type": { "type": ["string","null"] },
-    "expected_type": { "type": ["string","null"] },
-    "expected_type_source": { "enum": ["argument","return","assignment","initializer","expression_body","condition", null] },
-    "locals": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
-    "parameters": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
-    "this_members": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
-    "receiver_type": { "type": ["string","null"] },
-    "receiver_kind": { "enum": ["instance","type","namespace","logger", null] },
-    "members": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
-    "invocation_candidates": { "type": "array", "items": { "type": "object", "required": ["signature","argument_index"],
-      "properties": { "signature": { "type": "string" }, "argument_index": { "type": "integer", "minimum": 0 }, "parameter_name": { "type": ["string","null"] }, "parameter_type": { "type": ["string","null"] } } } },
-    "snapshot_syntax_errors": { "type": "integer", "minimum": 0 },
-    "synthetic_suffix": { "type": ["string","null"], "pattern": "^(\\n\\}+)?$" },
-    "truncated": { "type": "boolean" },
-    "dropped_recovery_artifacts": { "type": "integer", "minimum": 0 },
-    "prompt": { "type": ["string","null"] },
-    "leakage": { "type": ["object","null"], "required": ["target_identifiers","covered_target_identifiers","violations"],
-      "properties": { "target_identifiers": { "type": "array" }, "covered_target_identifiers": { "type": "array" }, "violations": { "type": "array", "maxItems": 0 } } }
+    "schema_version": {
+      "const": "flc-semantic/v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "visibility_policy": {
+      "enum": [
+        "editor_snapshot",
+        "strict_prefix"
+      ]
+    },
+    "analysis_engine": {
+      "enum": [
+        "speculative",
+        "speculative_scope",
+        "statement_scope",
+        "fork",
+        "fork_after_speculative_error",
+        null
+      ]
+    },
+    "status": {
+      "enum": [
+        "resolved",
+        "partially_resolved",
+        "syntax_fallback",
+        "failed"
+      ]
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "project": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "enclosing_symbol": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "enclosing_kind": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "enclosing_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "return_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expected_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expected_type_source": {
+      "enum": [
+        "argument",
+        "return",
+        "assignment",
+        "initializer",
+        "expression_body",
+        "condition",
+        null
+      ]
+    },
+    "locals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "this_members": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "receiver_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "receiver_kind": {
+      "enum": [
+        "instance",
+        "type",
+        "namespace",
+        "logger",
+        null
+      ]
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "invocation_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "signature",
+          "argument_index"
+        ],
+        "properties": {
+          "signature": {
+            "type": "string"
+          },
+          "argument_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "parameter_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parameter_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "snapshot_syntax_errors": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "synthetic_suffix": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(\\n\\}+)?$"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "dropped_recovery_artifacts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "prompt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "leakage": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "target_identifiers",
+        "covered_target_identifiers",
+        "violations"
+      ],
+      "properties": {
+        "target_identifiers": {
+          "type": "array"
+        },
+        "covered_target_identifiers": {
+          "type": "array"
+        },
+        "violations": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    },
+    "context_types": {
+      "type": "array",
+      "description": "Contracts of nearby project types (selected from in-scope symbol types, base types and type names in the visible prefix; never from the target).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "kind",
+          "source",
+          "members"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "class",
+              "interface",
+              "struct",
+              "enum",
+              "record"
+            ]
+          },
+          "source": {
+            "enum": [
+              "local",
+              "parameter",
+              "member",
+              "base",
+              "prefix"
+            ]
+          },
+          "is_static": {
+            "type": "boolean"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/fact"
+            }
+          },
+          "total_members": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
   }
 }

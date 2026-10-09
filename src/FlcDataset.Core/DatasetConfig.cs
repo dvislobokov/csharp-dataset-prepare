@@ -104,6 +104,11 @@ public sealed record SemanticConfig
     public int MaxScopeSymbols { get; init; } = 48;
     public int MaxMembers { get; init; } = 48;
     public int MaxThisMembers { get; init; } = 48;
+    /// <summary>TYPE block: max nearby project types and members shown per type (0 disables the block).</summary>
+    public int MaxContextTypes { get; init; } = 6;
+    public int MaxTypeMembers { get; init; } = 10;
+    /// <summary>Also consider types from referenced assemblies (framework/NuGet); default only types with source in the repository.</summary>
+    public bool ContextTypesIncludeMetadata { get; init; }
     public int TimeoutMs { get; init; } = 10000;
     /// <summary>Deterministic hash-selected fraction of samples to enrich (E2 subset). 1.0 = all eligible samples (E3).</summary>
     public double SubsetFraction { get; init; } = 0.1;
