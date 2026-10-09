@@ -53,3 +53,9 @@ Per-repository sample counts are capped by the pipeline (maximum observed 20 000
   or copied code; results on this set are expected to differ from those on popular repositories and are not directly comparable.
 - Licence per row is carried in the dataset (only permissive licences were searched).
 - Star counts are a snapshot taken at search time; repositories were pinned to the HEAD at processing time (revision per row).
+
+## Near-copies of training code (checked after the build)
+
+`scripts/near_dup.py` against the corpus train split (MinHash, Jaccard >= 0.8): C# 1 081 of 37 531 files (2.9 %), 12 repositories
+mostly copies (e.g. re-uploads of other projects); Go 917 of 28 933 files (3.2 %), 1 repository (exccd, a btcd fork).
+Lists: `eval-fresh/decontam/near_duplicates.jsonl` and `summary.json` in both HF datasets. **Drop these files before evaluating.**

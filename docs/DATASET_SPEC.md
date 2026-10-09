@@ -20,6 +20,8 @@ All outputs of one run live in one directory, written atomically (`<out>.tmp-<pi
 
 * `*_utf16_offset`: UTF-16 code units into the **decoded** file text, BOM removed (Roslyn positions).
 * `*_byte_offset`: bytes into the **original** file, BOM included. `source_sha256` hashes those original bytes.
+  **Note:** the `corpus` config stores `content` without the BOM (`has_bom` records it), so for files with a BOM a byte
+  offset of a sample is 3 larger than the same position in `content.encode("utf-8")`. UTF-16 offsets are unaffected.
 * Original bytes = `(has_bom ? EF BB BF : "") + UTF8(content)`; files that are not strict UTF-8 (or are UTF-16 / contain NUL) are skipped with a reason.
 * Lines/columns are zero-based; columns count UTF-16 units. Line breaks follow Roslyn: CRLF, CR, LF, U+0085, U+2028, U+2029.
 
