@@ -19,6 +19,7 @@ Resumable: every stage skips repositories/shards that are already done. Never bu
 from __future__ import annotations
 
 import argparse
+import collections
 import concurrent.futures as cf
 import gzip
 import json
@@ -87,7 +88,7 @@ def select(a, token):
     done_path = os.path.join(a.work, "select.done")
     done = set(open(done_path).read().split()) if os.path.exists(done_path) else set()
     shards = sorted(f for f in HfApi(token=token).list_repo_files(REPO, repo_type="dataset")
-                    if f.startswith("data/samples/") and f.endswith(".parquet") and f not in done)
+                    if f.startswith(a.prefix + "data/samples/") and f.endswith(".parquet") and f not in done)
     meta_path = os.path.join(a.work, "repos.jsonl")
     with cf.ProcessPoolExecutor(a.jobs) as pool, open(done_path, "a") as dl, open(meta_path, "a") as ml:
         for name, n, picked, reasons, meta in pool.map(_select_shard, [(s, a.work, token) for s in shards]):
@@ -171,15 +172,38 @@ def run_all(a, gh_token):
 
 # --------------------------------------------------------------------------------------------------------------- pack
 def pack(a, token):
+    """Stream the per-repository outputs into parquet (one writer per split, 50k-row batches): bounded memory."""
     import pyarrow as pa
     import pyarrow.parquet as pq
     sc = fr.schemas()["semantic"]
-    metas = {json.loads(l)["repository_id"]: json.loads(l) for l in open(os.path.join(a.work, "repos.jsonl"))}
-    by_split: dict[str, list] = {}
+    metas = {}
+    for line in open(os.path.join(a.work, "repos.jsonl")):
+        m = json.loads(line)
+        metas[m["repository_id"]] = m
+    dest = os.path.join(a.work, "upload", a.prefix + "semantic-fix")
+    shutil.rmtree(dest, ignore_errors=True)
+    os.makedirs(dest)
+    writers, buffers, counts, parts = {}, {}, collections.Counter(), collections.Counter()
+
+    def flush(split, final=False):
+        rows = buffers.get(split) or []
+        if not rows:
+            return
+        w = writers.get(split)
+        if w is None or (w is not None and counts[split] >= 500_000 * (parts[split])):
+            if w is not None:
+                w.close()
+            w = writers[split] = pq.ParquetWriter(os.path.join(dest, f"{split}-{parts[split]:04d}.parquet"), sc, compression="zstd")
+            parts[split] += 1
+        w.write_table(pa.Table.from_pylist(rows, schema=sc))
+        counts[split] += len(rows)
+        buffers[split] = []
+
     for rid, m in sorted(metas.items()):
         p = os.path.join(a.work, "out", fr.slug(rid) + ".jsonl")
         if not os.path.exists(p):
             continue
+        split = m["split"]
         for line in open(p):
             r = json.loads(line)
             if r.get("visibility_policy") != "editor_snapshot":
@@ -188,22 +212,19 @@ def pack(a, token):
             lk = r.get("leakage") or {}
             r["target_identifiers"] = lk.get("target_identifiers")
             r["covered_target_identifiers"] = lk.get("covered_target_identifiers")
-            by_split.setdefault(m["split"], []).append(fr.pick(r, sc))
-    dest = os.path.join(a.work, "upload", "semantic-fix")
-    shutil.rmtree(dest, ignore_errors=True)
-    os.makedirs(dest)
-    counts = {}
-    for split, rows in by_split.items():
-        for k in range(0, len(rows), 500_000):
-            pq.write_table(pa.Table.from_pylist(rows[k:k + 500_000], schema=sc),
-                           os.path.join(dest, f"{split}-{k // 500_000:04d}.parquet"), compression="zstd")
-        counts[split] = len(rows)
-    json.dump({"records": counts, "reason": "extractor fixes: partly typed member name after '.', capped-list ranking"},
-              open(os.path.join(dest, "summary.json"), "w"), indent=1)
-    log(event="packed", **counts)
+            buffers.setdefault(split, []).append(fr.pick(r, sc))
+            if len(buffers[split]) >= 50_000:
+                flush(split)
+    for split in list(buffers):
+        flush(split)
+    for w in writers.values():
+        w.close()
+    json.dump({"records": dict(counts), "reason": "extractor fixes: partly typed member name after '.', capped-list ranking, "
+               "duplicate ProjectReference"}, open(os.path.join(dest, "summary.json"), "w"), indent=1)
+    log(event="packed", **dict(counts))
     if a.upload:
         from huggingface_hub import HfApi
-        HfApi(token=token).upload_folder(folder_path=dest, path_in_repo="semantic-fix", repo_id=REPO, repo_type="dataset",
+        HfApi(token=token).upload_folder(folder_path=dest, path_in_repo=a.prefix + "semantic-fix", repo_id=REPO, repo_type="dataset",
                                          commit_message="semantic-fix: C# records recomputed after extractor fixes")
         log(event="uploaded")
 
@@ -222,6 +243,7 @@ def main():
     ap.add_argument("--hf-token-file", default="/srv/flc/secrets/HF_TOKEN")
     ap.add_argument("--github-token-file", default="/srv/flc/secrets/GITHUB_TOKEN")
     ap.add_argument("--keep-work", action="store_true")
+    ap.add_argument("--prefix", default="", help="dataset folder prefix, e.g. eval-fresh/")
     ap.add_argument("--limit", type=int, default=0, help="run: only the N smallest repositories (trial)")
     ap.add_argument("--upload", action="store_true")
     a = ap.parse_args()
