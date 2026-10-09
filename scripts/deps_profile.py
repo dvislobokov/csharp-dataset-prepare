@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Project dependency profiles (`DEPS` line of docs/CONTEXT_SPEC-RU.md, section 4) from the corpus config.
+Project dependency profiles (docs/CONTEXT_SPEC-RU.md v1.1, section 4) from the corpus config.
 
 Per repository: for every file, the set of external library roots it imports (C#: using directives; Go: import paths),
 with the repository's own namespaces/module and the standard library removed. The profile of a file is computed from the
-OTHER files of its repository: roots used in >= 2 other files, by file count (desc) then name, top 12, <= 200 chars.
+OTHER files of its repository: roots used in >= 2 other files, by file count (desc) then name; the token limit is
+applied when the prompt is rendered.
 
 Outputs (parquet, zstd):
   file_roots.parquet  repository_id, relative_path, sha256, roots (list<string>)  -- per corpus file
   repo_roots.parquet  repository_id, root, files                                 -- per repository root counts
-and summary.json (coverage, top roots). `profile_for(repo_counts, file_roots)` gives the DEPS items of one file.
+and summary.json (coverage, top roots). `profile_for(repo_counts, file_roots)` gives the ordered profile roots of one file.
 
   python -I scripts/deps_profile.py --lang csharp --corpus /srv/flc/engine-shards/src/data/corpus --out /srv/flc/deps/csharp
 """
@@ -23,7 +24,7 @@ import multiprocessing as mp
 import os
 import re
 
-MAX_ITEMS, MAX_CHARS, MIN_FILES = 12, 200, 2
+MIN_FILES = 2  # the token limit (contextDepsMaxTokens) is applied when the prompt is rendered
 
 # ---------------------------------------------------------------------------------------------------------------- C#
 CS_USING = re.compile(r"^[ \t]*(?:global[ \t]+)?using[ \t]+(?:static[ \t]+)?(?:[A-Za-z_]\w*[ \t]*=[ \t]*)?"
@@ -43,11 +44,9 @@ def cs_root(ns: str) -> str | None:
 
 
 def cs_own(ns: str, declared: set[str]) -> bool:
-    """A namespace of the repository itself: declared there, or a prefix / extension of a declared one."""
-    for d in declared:
-        if ns == d or ns.startswith(d + ".") or d.startswith(ns + "."):
-            return True
-    return False
+    """A namespace of the repository itself: declared there or nested in a declared one (CONTEXT_SPEC section 4, review E3:
+    a parent of a declared namespace is NOT own, e.g. `Serilog` in a `Serilog.Sinks.X` repository stays a dependency)."""
+    return any(ns == d or ns.startswith(d + ".") for d in declared)
 
 
 # ---------------------------------------------------------------------------------------------------------------- Go
@@ -102,17 +101,11 @@ def _work(args):
 
 
 def profile_for(repo_counts: dict[str, int], own_roots: list[str]) -> list[str]:
-    """DEPS items of one file: roots in >= MIN_FILES OTHER files of the repository, top MAX_ITEMS within MAX_CHARS."""
+    """Profile roots of one file, in order: roots used in >= MIN_FILES OTHER files of the repository, by file count (desc)
+    then name. The renderer keeps the longest head whose encoding fits contextDepsMaxTokens."""
     mine = set(own_roots)
     items = [(c - (1 if r in mine else 0), r) for r, c in repo_counts.items()]
-    items = sorted(((n, r) for n, r in items if n >= MIN_FILES), key=lambda x: (-x[0], x[1]))[:MAX_ITEMS]
-    out, size = [], len("DEPS")
-    for _, r in items:
-        if size + 1 + len(r) > MAX_CHARS:
-            break
-        out.append(r)
-        size += 1 + len(r)
-    return out
+    return [r for _, r in sorted(((n, r) for n, r in items if n >= MIN_FILES), key=lambda x: (-x[0], x[1]))]
 
 
 def main():
@@ -159,7 +152,7 @@ def main():
     pq.write_table(pa.Table.from_pylist(rr_rows), os.path.join(a.out, "repo_roots.parquet"), compression="zstd")
     summary = {"lang": a.lang, "repositories": len(by_repo), "files": total,
                "files_with_nonempty_profile": covered, "share_nonempty": round(covered / max(total, 1), 4),
-               "rules": {"max_items": MAX_ITEMS, "max_chars": MAX_CHARS, "min_other_files": MIN_FILES},
+               "rules": {"min_other_files": MIN_FILES, "limit": "contextDepsMaxTokens at render time"},
                "top_roots_by_repositories": root_repos.most_common(60)}
     json.dump(summary, open(os.path.join(a.out, "summary.json"), "w"), indent=1)
     print(json.dumps({k: v for k, v in summary.items() if k != "top_roots_by_repositories"}), flush=True)

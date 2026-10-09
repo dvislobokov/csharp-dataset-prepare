@@ -54,9 +54,13 @@ def _select_shard(args):
     from huggingface_hub import hf_hub_download
     split = os.path.basename(name).split("-")[0]
     cache = os.path.join(work, "hf")
+    from huggingface_hub.errors import EntryNotFoundError
     sp = hf_hub_download(REPO, name, repo_type="dataset", token=token, cache_dir=cache)
-    mp = hf_hub_download(REPO, name.replace("data/samples/", "data/semantic/"), repo_type="dataset", token=token, cache_dir=cache)
-    trunc = {r["sample_id"] for r in pq.read_table(mp, columns=["sample_id", "truncated"]).to_pylist() if r["truncated"]}
+    try:  # a batch whose repositories produced no semantic records has no semantic shard
+        mp = hf_hub_download(REPO, name.replace("data/samples/", "data/semantic/"), repo_type="dataset", token=token, cache_dir=cache)
+        trunc = {r["sample_id"] for r in pq.read_table(mp, columns=["sample_id", "truncated"]).to_pylist() if r["truncated"]}
+    except EntryNotFoundError:
+        mp, trunc = None, set()
     rows = pq.read_table(sp).to_pylist()
     picked: dict[str, list] = {}
     reasons = {"after_dot_partial": 0, "truncated": 0}
@@ -69,7 +73,7 @@ def _select_shard(args):
         r.update({"split": split, "config_sha256": "semantic-redo", "schema_version": "flc-sample/v1"})
         r.pop("license", None)
         picked.setdefault(r["repository_id"], []).append(r)
-    for path in (sp, mp):
+    for path in (p for p in (sp, mp) if p):
         try:
             os.remove(os.path.realpath(path))  # shards are large; keep the disk free
         except OSError:
