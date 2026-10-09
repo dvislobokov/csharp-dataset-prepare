@@ -37,6 +37,11 @@ and the current state. Sister project for Go: https://github.com/dvislobokov/go-
 ## State (2026-10-09) and next steps
 - Done: main + star-bucket runs uploaded (8 130 repos with samples, 8 143 in the corpus), engine shards published, tokenizer study.
 - Context block spec (draft, for the user to review): `docs/CONTEXT_SPEC-RU.md` (`flc-context/v1`).
+- 2026-10-09 evening: context spec v1.1 (`docs/CONTEXT_SPEC-RU.md`, review in `docs/CONTEXT_SPEC_REVIEW-RU.md`); extractor
+  fixes (no rank leak from the hidden target, RECV/MEMBER for `obj.Na|`); C# semantic fix pass `scripts/semantic_redo.py`
+  (select → run → pack to `semantic-fix/` on HF) in progress under `/srv/flc/redo`; clean eval set `eval-fresh/` (5..19 stars,
+  `docs/EVAL_FRESH.md`); decontamination and DEPS profiles (`docs/DECONTAMINATION.md`); plugin baseline
+  (`docs/PLUGIN_BASELINE.md`); architecture research (`docs/ARCH_RESEARCH-RU.md`).
 - Next (agreed plan): (1) per-repository dependency profile `DEPS` (external `using` namespaces in ≥2 other files of the repo);
   (2) spec of the context block for the plugin (facts `RET/ARG/LOCAL/RECV/MEMBER/CALL/TYPE` right before the current line via
   `<|reserved_N|>` specials, `DEPS` at the start; golden examples); (3) generator of training documents in the engine format with
