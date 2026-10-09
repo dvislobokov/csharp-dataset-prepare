@@ -36,6 +36,7 @@ and the current state. Sister project for Go: https://github.com/dvislobokov/go-
 
 ## State (2026-10-09) and next steps
 - Done: main + star-bucket runs uploaded (8 130 repos with samples, 8 143 in the corpus), engine shards published, tokenizer study.
+- Context block spec (draft, for the user to review): `docs/CONTEXT_SPEC-RU.md` (`flc-context/v1`).
 - Next (agreed plan): (1) per-repository dependency profile `DEPS` (external `using` namespaces in ≥2 other files of the repo);
   (2) spec of the context block for the plugin (facts `RET/ARG/LOCAL/RECV/MEMBER/CALL/TYPE` right before the current line via
   `<|reserved_N|>` specials, `DEPS` at the start; golden examples); (3) generator of training documents in the engine format with
