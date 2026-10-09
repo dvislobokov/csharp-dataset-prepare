@@ -27,7 +27,7 @@ for l in open(sys.argv[1]):
     >> /srv/flc/corpus/stdout.log 2>&1 &
   b=$!
   wait $a $b
-  [ "$n_done" -ge 16 ] && { echo '{"event": "all_buckets_processed"}'; break; }
+  [ "$n_done" -ge "${N_BUCKETS:-15}" ] && { echo '{"event": "all_buckets_processed"}'; break; }
   # wait for at least one new bucket before the next round
   until [ "$(ls "$S"/stars_*.done 2>/dev/null | wc -l)" -gt "$n_done" ]; do sleep 60; done
 done

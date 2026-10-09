@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Search GitHub for every 5-star bucket below the original search (0..80), highest first, then run the selection on each.
+# Search GitHub for every 5-star bucket below the original search (5..80), highest first, then run the selection on each.
 set -euo pipefail
 APP=${APP:-/srv/flc/app}
 OUT=${OUT:-/srv/flc/search}
 PY=${PY:-/srv/flc/venv/bin/python}
 mkdir -p "$OUT"
-for lo in 75 70 65 60 55 50 45 40 35 30 25 20 15 10 5 0; do
+# 0..4 stars excluded by the user on 2026-10-09 (mostly personal/coursework repositories); set BUCKETS to override.
+for lo in ${BUCKETS:-75 70 65 60 55 50 45 40 35 30 25 20 15 10 5}; do
   hi=$((lo + 4)); [ "$lo" = 75 ] && hi=80
   tag=$(printf "%02d_%02d" "$lo" "$hi")
   [ -f "$OUT/stars_$tag.done" ] && continue
