@@ -408,7 +408,15 @@ def process(job: dict, args, st: State, log: Log, gh_token: str | None) -> dict:
     # 7. Parquet for this repository (cross-repository exact-file dedup by first owner)
     pending = os.path.join(args.out, "pending", slug(rid))
     shutil.rmtree(pending, ignore_errors=True)
-    rows = timed("pack", lambda: pack_repo(job, rev, data_dir, os.path.join(jd, "prompts"), pending + ".tmp", st, args))
+    shutil.rmtree(pending + ".tmp", ignore_errors=True)
+    # Packing is JSON/Arrow-heavy Python: run it in its own process so 100 concurrent jobs are not serialised by the GIL.
+    spec = json.dumps({"job": job, "rev": rev, "data_dir": data_dir, "prompt_dir": os.path.join(jd, "prompts"), "dest": pending + ".tmp"})
+    code, why = timed("pack", lambda: run([sys.executable, "-I", os.path.abspath(__file__), "--pack-job", spec, "--state", args.state],
+                                          timeout=args.syntax_timeout, rss_limit=rss, log_path=lp))
+    done = os.path.join(pending + ".tmp", "DONE")
+    if code != 0 or not os.path.exists(done):
+        return {"status": "failed", "reason": f"pack:{why or code}", "stats": stats, "revision": rev}
+    rows = json.load(open(done))
     os.replace(pending + ".tmp", pending)
     stats.update(rows)
     stats["outcome"] = outcome
@@ -598,6 +606,7 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
     import pyarrow as pa
     import pyarrow.parquet as pq
     repos = json.loads(st.q("SELECT repos FROM batches WHERE id=?", (bid,))[0][0])
+    t_merge = time.time()
     sc = schemas()
     stage = os.path.join(args.out, "upload", f"batch-{bid:06d}")
     shutil.rmtree(stage, ignore_errors=True)
@@ -634,6 +643,8 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
             REMOTE_FILES.add(os.path.relpath(os.path.join(root, f), stage).replace(os.sep, "/"))
     open(os.path.join(stage, "README.md"), "w").write(readme(st, args))
     open(os.path.join(stage, "LICENSE.md"), "w").write(LICENSE_MD)
+    t_upload = time.time()
+    stage_bytes = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(stage) for f in fs)
     if api is not None:
         for attempt in range(8):
             try:
@@ -653,7 +664,8 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
         shutil.rmtree(stage, ignore_errors=True)
         for rid in repos:
             shutil.rmtree(os.path.join(args.out, "pending", slug(rid)), ignore_errors=True)
-    log("batch_uploaded", batch=bid, repos=len(repos), rows=counts, remote=api is not None)
+    log("batch_uploaded", batch=bid, repos=len(repos), rows=counts, remote=api is not None, mb=round(stage_bytes / 2**20, 1),
+        merge_s=round(t_upload - t_merge, 1), upload_s=round(time.time() - t_upload, 1))
 
 
 def refresh_remote_files(api, args):
@@ -671,7 +683,8 @@ def refresh_remote_files(api, args):
 # -------------------------------------------------------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--manifest", required=True)
+    ap.add_argument("--manifest")
+    ap.add_argument("--pack-job", help=argparse.SUPPRESS)
     ap.add_argument("--base-config", default=os.path.join(ROOT, "configs/bulk.base.json"))
     ap.add_argument("--cli", default=os.path.join(ROOT, "src/FlcDataset.Cli/bin/Release/net10.0/flc-dataset"))
     ap.add_argument("--dotnet-root", default=os.environ.get("DOTNET_ROOT", "/opt/dotnet"))
@@ -709,6 +722,13 @@ def main():
     ap.add_argument("--keep-work", action="store_true")
     ap.add_argument("--keep-local", action="store_true")
     args = ap.parse_args()
+    if args.pack_job:
+        spec = json.loads(args.pack_job)
+        counts = pack_repo(spec["job"], spec["rev"], spec["data_dir"], spec["prompt_dir"], spec["dest"], State(args.state), args)
+        print(json.dumps(counts))
+        return
+    if not args.manifest:
+        ap.error("--manifest is required")
 
     for d in (args.work, args.out, args.logs):
         os.makedirs(d, exist_ok=True)
@@ -735,6 +755,29 @@ def main():
     prefetch_meta(st, gh_token, log)
     for (bid,) in st.q("SELECT id FROM batches WHERE status='created' ORDER BY id"):
         write_and_upload_batch(bid, st, args, log, api)
+
+    # Batching/upload runs in its own thread so job scheduling never waits for Parquet merging or the network.
+    drain = threading.Event()
+    upload_error: list[BaseException] = []
+
+    def uploader():
+        try:
+            while not STOP.is_set():
+                final = drain.is_set()
+                bid = make_batch(st, args, log, final=final)
+                if bid is not None:
+                    write_and_upload_batch(bid, st, args, log, api)
+                    continue
+                if final:
+                    return
+                time.sleep(10)
+        except BaseException as e:  # noqa: BLE001 - surface in main thread, stop scheduling
+            upload_error.append(e)
+            log("error", where="uploader", trace=traceback.format_exc()[-2000:])
+            STOP.set()
+
+    up_thread = threading.Thread(target=uploader, name="uploader", daemon=True)
+    up_thread.start()
 
     where = "status='pending' AND attempts < ?"
     params: list = [args.max_attempts]
@@ -766,7 +809,8 @@ def main():
             res = process(job, args, st, log, gh_token)
         except Exception as e:  # noqa: BLE001 - never let one repository stop the run
             res = {"status": "failed", "reason": f"exception:{type(e).__name__}:{str(e)[:200]}", "trace": traceback.format_exc()[-2000:]}
-        if STOP.is_set() and res["status"] in ("failed",) and "stopped" in (res.get("reason") or ""):
+        # Any failure while shutting down is an interruption (a killed validator/render leaves no result), not a verdict.
+        if STOP.is_set() and res["status"] == "failed":
             st.x("UPDATE jobs SET status='pending' WHERE repo_id=?", (rid,))
             return res
         st.x("UPDATE jobs SET status=?, reason=?, revision=?, samples=?, semantic=?, cs_bytes=?, stats=?, finished=? WHERE repo_id=?",
@@ -794,9 +838,6 @@ def main():
             done, _ = cf.wait(list(running), timeout=5, return_when=cf.FIRST_COMPLETED)
             for f in done:
                 running.pop(f)
-            bid = make_batch(st, args, log, final=False)
-            if bid is not None:
-                write_and_upload_batch(bid, st, args, log, api)
             if time.time() - last_progress > 60:
                 last_progress = time.time()
                 counts = dict(st.q("SELECT status, COUNT(*) FROM jobs GROUP BY status"))
@@ -806,11 +847,8 @@ def main():
         if STOP.is_set():
             for f in running:
                 f.cancel()
-    while not STOP.is_set():
-        bid = make_batch(st, args, log, final=True)
-        if bid is None:
-            break
-        write_and_upload_batch(bid, st, args, log, api)
+    drain.set()
+    up_thread.join()
     counts = dict(st.q("SELECT status, COUNT(*) FROM jobs GROUP BY status"))
     log("stop" if STOP.is_set() else "finished", statuses=counts)
 

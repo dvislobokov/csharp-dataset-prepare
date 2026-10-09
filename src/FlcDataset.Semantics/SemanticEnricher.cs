@@ -61,6 +61,7 @@ public sealed class SemanticEnricher(ISemanticDocumentSource source, DatasetConf
                 var rec = await AnalyzeOne(fileCtx!, s, policy, counters, latency, ct);
                 records.Add(rec);
                 counters.Add($"semantic.{policy}.status.{rec.Status}");
+                if (rec.Reason?.StartsWith("leak_audit:", StringComparison.Ordinal) == true) counters.Add($"semantic.{policy}.leak_audit_dropped");
                 if (rec.Reason is not null) counters.Add($"semantic.{policy}.reason.{rec.Reason}");
                 if (rec.Leakage is { } lk)
                 {

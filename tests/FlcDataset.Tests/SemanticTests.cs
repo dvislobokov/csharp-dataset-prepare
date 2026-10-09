@@ -1,3 +1,4 @@
+using FlcDataset.Cli;
 using FlcDataset.Core;
 using FlcDataset.Extraction;
 using FlcDataset.Semantics;
@@ -352,5 +353,41 @@ public class ContextTypeTests
         var r = await SemanticAnalyzer.AnalyzeAsync(src.Find("src/Billing.cs", out _)!, TestUtil.SampleAt(doc, "src/Billing.cs", TestUtil.After(Code, "var inv", true)),
             VisibilityPolicy.EditorSnapshot, new SemanticConfig { MaxContextTypes = 0 }, TestContext.Current.CancellationToken);
         Assert.Empty(r.ContextTypes);
+    }
+}
+
+public class PatternCombinatorTests
+{
+    [Fact]
+    public async Task PatternCombinatorKeywordIsNeverALocal()
+    {
+        var code = "enum K { A, B, C }\nclass C\n{\n    static bool M(K k) => k is\n        K.A or\n        K.B or\n        K.C;\n}\n";
+        var doc = SourceDocument.FromText(code);
+        using var src = AdhocDocumentSource.Create(TestUtil.FixtureRepo, [("src/K.cs", null, code)]);
+        var caret = TestUtil.After(code, "K.C;", atStart: true);
+        foreach (var engine in new[] { "auto", "fork" })
+        {
+            var r = await SemanticAnalyzer.AnalyzeAsync(src.Find("src/K.cs", out _)!, TestUtil.SampleAt(doc, "src/K.cs", caret),
+                VisibilityPolicy.EditorSnapshot, new SemanticConfig { Engine = engine }, TestContext.Current.CancellationToken);
+            Assert.DoesNotContain(r.Locals, l => l.Name == "or");
+            Assert.Empty(r.Leakage!.Violations);
+        }
+    }
+}
+
+public class LeakAuditDegradeTests
+{
+    [Fact]
+    public void ValidatorStillRejectsAnyShippedViolation()
+    {
+        // The analyzer degrades violating records itself; the schema/validator gate must still reject a record that carries one.
+        DatasetValidator.SchemaDirectory = Path.Combine(AppContext.BaseDirectory, "schemas");
+        // Private registry: the validator registers the same $id globally.
+        var text = File.ReadAllText(Path.Combine(DatasetValidator.SchemaDirectory, "flc-semantic.v1.schema.json")).Replace("\"$id\"", "\"$comment\"");
+        var schema = Json.Schema.JsonSchema.FromText(text);
+        var bad = FlcJson.Serialize(new SemanticRecord { SampleId = new string('a', 32), VisibilityPolicy = "editor_snapshot", Status = "resolved",
+            Leakage = new LeakageAudit { TargetIdentifiers = [], CoveredTargetIdentifiers = [], Violations = ["x"] } });
+        using var doc = System.Text.Json.JsonDocument.Parse(bad);
+        Assert.False(schema.Evaluate(doc.RootElement).IsValid);
     }
 }

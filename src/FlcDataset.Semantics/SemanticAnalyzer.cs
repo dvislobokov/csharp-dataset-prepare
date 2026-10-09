@@ -183,6 +183,8 @@ public static class SemanticAnalyzer
                             if (decl.Span.Start >= pos) continue; // declared later in the block: in scope but not yet usable
                             if (currentDeclarator is not null && decl.Span == currentDeclarator.Span) continue;
                             if (BeingTyped(l)) continue; // e.g. `out var su|bscriptions`: the name is still being typed
+                            // `X or` + removed line parses as a declaration pattern whose designation is the combinator keyword.
+                            if (l.Name is "or" or "and" or "not") continue;
                             shadowing.Add(l.Name);
                             // Locals of earlier top-level statements live in the original tree (text before the caret is identical).
                             var (lt, ann) = LocalType(decl.SyntaxTree == ctx.Tree && decl.SyntaxTree != b.SnapshotTree ? ctx.Model : model, l, decl.GetSyntax(ct), ct);
@@ -498,7 +500,17 @@ public static class SemanticAnalyzer
                 DroppedRecoveryArtifacts = artifacts,
             };
             record = record with { Prompt = RenderPrompt(record) };
-            return record with { Leakage = Audit(record, sample, ctx, declaredHere) };
+            var audit = Audit(record, sample, ctx, declaredHere);
+            if (audit.Violations.Count == 0) return record with { Leakage = audit };
+            // A fact that cannot be traced outside the hidden target is never shipped: the semantic payload of this sample is
+            // dropped (status failed, reason names the symbols) while the syntax sample itself stays valid.
+            return new SemanticRecord
+            {
+                SampleId = sample.SampleId, VisibilityPolicy = policy, AnalysisEngine = b.Engine, Status = SemanticStatus.Failed,
+                Reason = "leak_audit:" + string.Join(",", audit.Violations), Project = ctx.Document.Project.Name,
+                SnapshotSyntaxErrors = b.ParseErrors, SyntheticSuffix = b.SyntheticSuffix, DroppedRecoveryArtifacts = artifacts,
+                Leakage = audit with { Violations = [] },
+            };
         }
     }
 
