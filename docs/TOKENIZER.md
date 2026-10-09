@@ -34,3 +34,26 @@ runs, whitespace runs kept whole (indentation = few tokens); byte-level, so any 
 * A joint C#+Go model needs the tokenizer retrained on the mixed corpus.
 * Carets often fall inside a token (`.Get`, ` x`, partial identifiers). For FLC fine-tuning tokenize prompt and completion
   separately (as at inference) so the model learns the caret boundaries; token healing can be added at inference.
+
+## Plugin engine tokenizer vs HF tokenizers (decision)
+
+Scripts: `scripts/tokcmp/compare_{csharp,go}.py` (with the engine's `cmlbpe.py` / `train_bpe.py`). Held-out repositories
+(validation/test of our corpus) and real completion targets of the test samples. B is trained by the engine's own
+`train_bpe` on a 1.5 GB repo-water-filled sample of our train split; C/D are HF byte-level BPE (`scripts/tokenizer_bench.py`).
+
+| Language | Tokenizer | Vocab | Bytes/token | Completion tokens (mean) | Plugin reads it |
+|---|---|---|---|---|---|
+| C# | A engine cs-16384.bpe (plugin now) | 16,384 | 4.221 | 10.0 | yes |
+| C# | B engine format, trained on our corpus | 16,384 | 4.23 | 9.96 | yes |
+| C# | C our HF 16k | 16,014 | 4.358 | 9.73 | no |
+| C# | D our HF 24k | 24,014 | 4.507 | 9.34 | no |
+| Go | A engine go-16384.bpe (plugin now) | 16,384 | 3.05 | 9.24 | yes |
+| Go | B engine format, trained on our Go corpus | 16,384 | 3.042 | 9.26 | yes |
+| Go | C HF 16k, trained on our Go corpus | 16,014 | 3.216 | 9.04 | no |
+| Go | D HF 24k, trained on our Go corpus | 24,014 | 3.316 | 8.81 | no |
+
+Retraining the engine tokenizer on our corpus changes nothing (A ≈ B); the HF pre-tokenisation saves 3–5 % tokens
+(16k) but the plugin cannot load it and the completion gets only ~0.2–0.3 tokens shorter. **Decision: keep the plugin
+tokenizers** (`cs-16384.bpe`, `go-16384.bpe`); the corpus is published encoded with them under `engine/` of the datasets
+(`scripts/encode_engine_shards.py`). The HF-tokenizer shards (`tokenized/`) were removed from the dataset; the HF
+tokenizers in `tokenizers/` are kept only as the record of the study.

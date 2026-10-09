@@ -1,0 +1,54 @@
+[
+  {
+    "tokenizer": "A engine go-16384.bpe (plugin now)",
+    "vocab": 16384,
+    "bytes_per_token": 3.05,
+    "chars_per_token": 3.036,
+    "heldout_tokens_M": 19.43,
+    "completion_tokens_mean": 9.24,
+    "completion_tokens_p95": 23,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 8.4,
+    "emb_params_M_d640": 10.5,
+    "seconds": 1
+  },
+  {
+    "tokenizer": "B engine format, trained on our Go corpus",
+    "vocab": 16384,
+    "bytes_per_token": 3.042,
+    "chars_per_token": 3.028,
+    "heldout_tokens_M": 19.48,
+    "completion_tokens_mean": 9.26,
+    "completion_tokens_p95": 23,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 8.4,
+    "emb_params_M_d640": 10.5,
+    "seconds": 1
+  },
+  {
+    "tokenizer": "C HF 16k, trained on our Go corpus",
+    "vocab": 16014,
+    "bytes_per_token": 3.216,
+    "chars_per_token": 3.201,
+    "heldout_tokens_M": 18.42,
+    "completion_tokens_mean": 9.04,
+    "completion_tokens_p95": 23,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 8.2,
+    "emb_params_M_d640": 10.2,
+    "seconds": 2
+  },
+  {
+    "tokenizer": "D HF 24k, trained on our Go corpus",
+    "vocab": 24014,
+    "bytes_per_token": 3.316,
+    "chars_per_token": 3.3,
+    "heldout_tokens_M": 17.87,
+    "completion_tokens_mean": 8.81,
+    "completion_tokens_p95": 22,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 12.3,
+    "emb_params_M_d640": 15.4,
+    "seconds": 2
+  }
+]

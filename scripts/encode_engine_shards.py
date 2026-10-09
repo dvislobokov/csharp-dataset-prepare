@@ -40,10 +40,12 @@ def _init(engine, vocab):
     _enc = cmlbpe.Encoder(cmlbpe.Vocab.load(vocab))
 
 
-def _work(path):
-    """One parquet shard -> (repo ids, paths, lengths, token bytes, source bytes); round trip checked on every file."""
+def _work(unit):
+    """One (parquet file, row group) -> (repo ids, paths, lengths, token bytes, source bytes); round trip checked on every
+    file. Row groups, not files, are the unit of parallelism: the Go corpus lives in a few large files."""
     import pyarrow.parquet as pq
-    t = pq.read_table(path, columns=["repository_id", "relative_path", "content"])
+    path, rg = unit
+    t = pq.ParquetFile(path).read_row_group(rg, columns=["repository_id", "relative_path", "content"])
     repos, paths, lens, arr, nbytes = [], [], [], array("H"), 0
     for r, p, c in zip(*(t.column(i).to_pylist() for i in range(3))):
         data = c.encode("utf-8")
@@ -60,16 +62,18 @@ def encode_fold(files, out_pre, args):
     offsets, repo_ids, repos = [0], [], {}
     ntok = nbytes = 0
     t0 = time.time()
+    import pyarrow.parquet as pq
+    units = [(f, rg) for f in files for rg in range(pq.ParquetFile(f).num_row_groups)]
     with mp.Pool(args.workers, _init, (args.engine, args.vocab)) as pool:
-        for k, (rs, ps, ls, raw, nb) in enumerate(pool.imap(_work, files)):   # imap keeps shard order
+        for k, (rs, ps, ls, raw, nb) in enumerate(pool.imap(_work, units)):   # imap keeps file/row-group order
             ftok.write(raw)
             for r, p, n in zip(rs, ps, ls):
                 offsets.append(offsets[-1] + n)
                 repo_ids.append(repos.setdefault(r, len(repos)))
                 fidx.write(f"{r}\t{p}\n")
             ntok += sum(ls); nbytes += nb
-            if k % 10 == 0:
-                log(event="progress", fold=os.path.basename(out_pre), shards=f"{k + 1}/{len(files)}", tokens=ntok,
+            if k % 50 == 0:
+                log(event="progress", fold=os.path.basename(out_pre), units=f"{k + 1}/{len(units)}", tokens=ntok,
                     mb_per_s=round(nbytes / 1e6 / max(time.time() - t0, 1e-9), 1))
     ftok.close(); fidx.close()
     with open(out_pre + ".offsets.u64.tmp", "wb") as f:

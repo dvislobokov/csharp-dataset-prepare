@@ -1,0 +1,54 @@
+[
+  {
+    "tokenizer": "A engine cs-16384.bpe (plugin now)",
+    "vocab": 16384,
+    "bytes_per_token": 4.221,
+    "chars_per_token": 4.197,
+    "heldout_tokens_M": 35.54,
+    "completion_tokens_mean": 10.0,
+    "completion_tokens_p95": 25,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 8.4,
+    "emb_params_M_d640": 10.5,
+    "seconds": 3
+  },
+  {
+    "tokenizer": "B engine format, trained on our corpus",
+    "vocab": 16384,
+    "bytes_per_token": 4.23,
+    "chars_per_token": 4.206,
+    "heldout_tokens_M": 35.46,
+    "completion_tokens_mean": 9.96,
+    "completion_tokens_p95": 25,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 8.4,
+    "emb_params_M_d640": 10.5,
+    "seconds": 3
+  },
+  {
+    "tokenizer": "C our HF 16k",
+    "vocab": 16014,
+    "bytes_per_token": 4.358,
+    "chars_per_token": 4.333,
+    "heldout_tokens_M": 34.42,
+    "completion_tokens_mean": 9.73,
+    "completion_tokens_p95": 24,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 8.2,
+    "emb_params_M_d640": 10.2,
+    "seconds": 4
+  },
+  {
+    "tokenizer": "D our HF 24k",
+    "vocab": 24014,
+    "bytes_per_token": 4.507,
+    "chars_per_token": 4.482,
+    "heldout_tokens_M": 33.28,
+    "completion_tokens_mean": 9.34,
+    "completion_tokens_p95": 23,
+    "roundtrip_failures": 0,
+    "emb_params_M_d512": 12.3,
+    "emb_params_M_d640": 15.4,
+    "seconds": 4
+  }
+]

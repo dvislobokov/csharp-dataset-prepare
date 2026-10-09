@@ -355,3 +355,8 @@ These refine or deviate from the proposals above; docs and tests were updated ac
 - **Semantic engines:** `semantic.engine=auto` uses statement_scope / speculative / speculative_scope binding against the original
   compilation (never binding the original edited line) and falls back to the document fork; see `docs/EXTRACTION_RULES.md`.
   `fork` remains selectable as the reference implementation (`--semantic-engine fork`, `semantic-compare` to diff).
+- **Bulk run (2026-10-09):** 4 322 repositories (≥81 stars) + 3 866 (35..80 stars, shards tagged by star bucket; 0..34
+  excluded by the user, `data/star-buckets/`). Orchestrator `scripts/flc_run.py` (state in SQLite, HF upload in batches).
+- **Tokenizer for the plugin model:** the plugin engine's own `cs-16384.bpe` (idea-ml-completion, pre-tokenizer go-code-1);
+  HF tokenizers only for the study (`docs/TOKENIZER.md`). The corpus is published encoded with it under `engine/cs-16384/`
+  in the engine's training-shard format (`scripts/encode_engine_shards.py`).

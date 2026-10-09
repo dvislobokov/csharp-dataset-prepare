@@ -1,0 +1,28 @@
+{
+  "n_total": 272,
+  "n_unique": 272,
+  "selected": 270,
+  "rejected": 2,
+  "unknown": 0,
+  "restricted": 0,
+  "reason_counts": {
+    "abuse_keyword": 1,
+    "noncode_or_list": 1
+  },
+  "cat_counts": {
+    "data/db/orm": 8,
+    "library/sdk": 36,
+    "desktop-ui": 21,
+    "game/unity": 40,
+    "other": 82,
+    "web/aspnet": 15,
+    "cloud/azure": 4,
+    "devtools": 15,
+    "testing": 3,
+    "ml/ai": 11,
+    "desktop-tool": 25,
+    "networking": 5,
+    "security": 3,
+    "iot/embedded": 2
+  }
+}
