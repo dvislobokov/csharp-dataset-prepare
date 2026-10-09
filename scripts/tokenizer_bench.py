@@ -72,7 +72,7 @@ def train_bpe(texts, vocab, threads):
     tok.decoder = decoders.ByteLevel()
     trainer = trainers.BpeTrainer(vocab_size=vocab, min_frequency=2, special_tokens=SPECIAL,
                                   initial_alphabet=pre_tokenizers.ByteLevel.alphabet(), show_progress=False)
-    tok.train_from_iterator(texts, trainer=trainer, length=len(texts))
+    tok.train_from_iterator(texts, trainer=trainer, length=len(texts) if hasattr(texts, "__len__") else None)
     return tok
 
 

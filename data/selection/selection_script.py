@@ -14,8 +14,10 @@ This script is pure and deterministic: same input -> byte-identical outputs.
 import json, re, math, collections, os, itertools
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-IN = os.path.join(HERE, "..", "csharp-search.jsonl")
-OUT = HERE
+import sys
+# Optional arguments: <input search jsonl> <output dir> (defaults: the original search and this directory).
+IN = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "csharp-search.jsonl")
+OUT = sys.argv[2] if len(sys.argv) > 2 else HERE
 
 # ---------------------------------------------------------------------------
 # License policy (SELECTION GOAL 1)
@@ -373,7 +375,7 @@ def main():
                 "repository_id": f"github.com/{fn}",
                 "revision": None,
                 "license": r["license"],
-                "provenance": "csharp-search.jsonl",
+                "provenance": os.path.basename(IN),
                 "priority": rec["priority"],
                 "fork_of": None,
                 "category": rec["category"],

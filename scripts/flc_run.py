@@ -147,6 +147,10 @@ class State:
         self.lock = threading.Lock()
         with self.lock:
             self.db.executescript(SCHEMA)
+            # per-job / per-batch shard tag (e.g. star bucket); older states lack the columns
+            for table in ("jobs", "batches"):
+                if "tag" not in {r[1] for r in self.db.execute(f"PRAGMA table_info({table})")}:
+                    self.db.execute(f"ALTER TABLE {table} ADD COLUMN tag TEXT")
 
     def q(self, sql: str, args=()):
         with self.lock:
@@ -164,18 +168,19 @@ def split_of(group: str, seed: str, eval_frac: float, test_frac: float) -> str:
 
 
 def load_manifest(st: State, path: str, args):
+    """Several manifests may be given comma-separated; a record's optional `run_tag` names its shards (default --run-tag)."""
     n = 0
-    for line in open(path, encoding="utf-8"):
+    for line in (ln for p in path.split(",") for ln in open(p, encoding="utf-8")):
         if not line.strip():
             continue
         r = json.loads(line)
         rid = r["repository_id"]
         full = rid.split("/", 1)[1]
         grp = r.get("group") or rid
-        st.x("""INSERT OR IGNORE INTO jobs(repo_id, full_name, url, size_kb, priority, license, grp, split, status)
-                VALUES(?,?,?,?,?,?,?,?, 'pending')""",
+        st.x("""INSERT OR IGNORE INTO jobs(repo_id, full_name, url, size_kb, priority, license, grp, split, status, tag)
+                VALUES(?,?,?,?,?,?,?,?, 'pending', ?)""",
              (rid, full, r["url"], int(r.get("size_kb") or 0), int(r.get("priority") or 0), r.get("license"), grp,
-              split_of(grp, args.seed, args.eval_fraction, args.test_fraction)))
+              split_of(grp, args.seed, args.eval_fraction, args.test_fraction), r.get("run_tag") or args.run_tag))
         n += 1
     return n
 
@@ -609,6 +614,12 @@ def readme(st: State, args) -> str:
         first = False
         for sp in present[cfg]:
             lines += [f"  - split: {sp}", f"    path: data/{cfg}/{sp}-*.parquet"]
+    # pre-tokenized corpus uploaded by scripts/tokenize_corpus.py (tokenized/<tokenizer>/corpus/<split>-*.parquet)
+    tokenized = sorted({p.split("/")[1] for p in REMOTE_FILES if p.startswith("tokenized/") and "/corpus/" in p})
+    for name in tokenized:
+        lines += [f"- config_name: corpus_tokens_{name.split('-')[-1]}", "  data_files:"]
+        for sp in sorted({os.path.basename(p).split("-")[0] for p in REMOTE_FILES if p.startswith(f"tokenized/{name}/corpus/")}):
+            lines += [f"  - split: {sp}", f"    path: tokenized/{name}/corpus/{sp}-*.parquet"]
     lines += ["- config_name: repos", "  data_files:", "  - split: train", "    path: data/repos/*.parquet", "---", ""]
     body = f"""# C# full-line completion dataset (Roslyn)
 
@@ -625,6 +636,7 @@ for attribution.
 | `prompts` | ready `flc-prompt/v2` pairs: `prompt` (special tokens as text) + `completion` ending with `<|eol|>`; loss on completion only |
 | `repos` | per-repository provenance and processing status |
 | `corpus` | whole accepted source files for causal pretraining (exact content, `has_bom`/`newline_style` recorded; same licence, generated-code, secret and cross-repository dedup rules) |
+""" + "".join(f"| `engine/{n}/` (files, not a config) | `corpus` encoded with the plugin engine's tokenizer `{n}.bpe` in the training-shard format of idea-ml-completion (`lm` = train, `validation`, `test`: `*.tokens.u16`, `*.offsets.u64`, `*.repo.u32`, `*.files.txt`, `*.meta.json`); its `train.py --data` reads them unchanged |\n" for n in sorted({p.split("/")[1] for p in REMOTE_FILES if p.startswith("engine/") and p.count("/") >= 2})) + "".join(f"| `corpus_tokens_{n.split('-')[-1]}` | `corpus` pre-tokenized with `tokenized/{n}/tokenizer.json` (trained on corpus train only): `input_ids` uint16 per file, framed `<|cs|><|path|>`path`\\n<|code|>\\n`content`<|endoftext|>`; counts in `tokenized/{n}/stats.json` |\n" for n in tokenized) + f"""
 
 Splits are assigned per repository group (forks/near-copies together); cross-repository duplicate files are kept once.
 No code was built or executed. See the builder repository for the data contract, leakage policy and benchmarks.
@@ -719,8 +731,17 @@ the respective license terms.
 
 def make_batch(st: State, args, log: Log, final: bool) -> int | None:
     """Assign ready repositories to a new batch (recorded before writing, so a crash re-creates the same batch)."""
-    ready = st.q("SELECT repo_id, samples FROM jobs WHERE status='packed' AND batch IS NULL ORDER BY repo_id")
-    total = sum(r[1] or 0 for r in ready)
+    ready = st.q("SELECT repo_id, samples, COALESCE(tag, ?) FROM jobs WHERE status='packed' AND batch IS NULL ORDER BY repo_id",
+                 (args.run_tag,))
+    # one tag per batch: take the tag with the most ready samples (or any when flushing at the end)
+    by_tag: dict[str, int] = {}
+    for _, n, tag in ready:
+        by_tag[tag] = by_tag.get(tag, 0) + (n or 0)
+    if not by_tag:
+        return None
+    tag = max(sorted(by_tag), key=lambda t: by_tag[t])
+    ready = [(rid, n) for rid, n, t in ready if t == tag]
+    total = by_tag[tag]
     if not ready or (not final and total < args.batch_samples):
         return None
     chosen, acc = [], 0
@@ -730,17 +751,18 @@ def make_batch(st: State, args, log: Log, final: bool) -> int | None:
         if acc >= args.batch_samples * 2:
             break
     with st.lock:
-        cur = st.db.execute("INSERT INTO batches(repos, status, created) VALUES(?, 'created', ?)", (json.dumps(chosen), now()))
+        cur = st.db.execute("INSERT INTO batches(repos, status, created, tag) VALUES(?, 'created', ?, ?)", (json.dumps(chosen), now(), tag))
         bid = cur.lastrowid
         st.db.executemany("UPDATE jobs SET batch=? WHERE repo_id=?", [(bid, r) for r in chosen])
-    log("batch_created", batch=bid, repos=len(chosen), samples=acc)
+    log("batch_created", batch=bid, repos=len(chosen), samples=acc, tag=tag)
     return bid
 
 
 def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
     import pyarrow as pa
     import pyarrow.parquet as pq
-    repos = json.loads(st.q("SELECT repos FROM batches WHERE id=?", (bid,))[0][0])
+    repos_json, tag = st.q("SELECT repos, COALESCE(tag, ?) FROM batches WHERE id=?", (args.run_tag, bid))[0]
+    repos = json.loads(repos_json)
     t_merge = time.time()
     sc = schemas()
     stage = os.path.join(args.out, "upload", f"batch-{bid:06d}")
@@ -755,7 +777,7 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
                 tables_by_split.setdefault(split, []).append(pq.read_table(p, schema=sc[cfg]))
         for split, tables in tables_by_split.items():
             t = pa.concat_tables(tables)
-            out = os.path.join(stage, "data", cfg, f"{split}-{args.run_tag}-{bid:06d}.parquet")
+            out = os.path.join(stage, "data", cfg, f"{split}-{tag}-{bid:06d}.parquet")
             os.makedirs(os.path.dirname(out), exist_ok=True)
             pq.write_table(t, out, compression="zstd", row_group_size=20000)
             counts[f"{cfg}/{split}"] = t.num_rows
@@ -771,7 +793,7 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
                       "keep_fraction": s.get("keep_fraction"), "test_keep_fraction": s.get("test_keep_fraction"),
                       "processed_utc": now()})
     if not args.corpus_only:
-        out = os.path.join(stage, "data", "repos", f"repos-{args.run_tag}-{bid:06d}.parquet")
+        out = os.path.join(stage, "data", "repos", f"repos-{tag}-{bid:06d}.parquet")
         os.makedirs(os.path.dirname(out), exist_ok=True)
         pq.write_table(pa.Table.from_pylist(rrows, schema=sc["repos"]), out, compression="zstd")
     for root, _, files in os.walk(stage):
@@ -791,7 +813,7 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
         for attempt in range(8):
             try:
                 api.upload_folder(repo_id=args.hf_repo, repo_type="dataset", folder_path=stage, path_in_repo=args.path_prefix or None,
-                                  commit_message=f"batch {bid}: {len(repos)} repositories ({args.run_tag})")
+                                  commit_message=f"batch {bid}: {len(repos)} repositories ({tag})")
                 break
             except Exception as e:  # noqa: BLE001 - network/rate limit: exponential backoff
                 log("upload_retry", batch=bid, attempt=attempt, error=str(e)[:300])
