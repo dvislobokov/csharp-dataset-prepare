@@ -9,7 +9,7 @@ main datasets (`flc-sample/v1`, `flc-semantic/v1`, `flc-prompt/v2`, `corpus-file
 ## Why it is clean
 - Star ranges are disjoint from every training source (the engine's threshold is 20 stars).
 - The draw excludes every `repo_id` present in the training state DBs (`/srv/flc/state/jobs.sqlite`,
-  `/srv/flc/corpus/state.sqlite`, `/srv/flc-go/state/jobs.sqlite`, `/srv/flc-go/corpus/state.sqlite`; 8 242 C# and 8 951 Go ids); none was found.
+  `/srv/flc/corpus/state.sqlite`, `/srv/flc-go/state/jobs.sqlite`, `/srv/flc-go/corpus/state.sqlite`; 8 242 C# and 8 951 Go ids); the script drops matches silently, so overlap was not counted separately.
 - Caveat: stars are a snapshot (2026-10-09). A repository can have had a different star count when a model corpus was built, and
   forks/copies of popular code can exist inside 5..19-star repositories (near-duplicate contamination is not measured here).
 
@@ -39,7 +39,7 @@ main datasets (`flc-sample/v1`, `flc-semantic/v1`, `flc-prompt/v2`, `corpus-file
 | corpus pass: uploaded repos | 299 (1 skipped) | 298 (2 skipped) |
 
 Splits are assigned by the orchestrators per repository group; the whole set is one evaluation set, so use all splits together.
-Samples are capped per repository by the pipeline (up to 20 000), so large repositories do not dominate.
+Per-repository sample counts are capped by the pipeline (maximum observed 20 000 per repository).
 
 ## Hugging Face paths
 - `dvislobokov/csharp-ml-complation` under `eval-fresh/`: `data/{samples,semantic,prompts}/<split>-fresh-<batch>.parquet`
