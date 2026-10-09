@@ -341,6 +341,8 @@ def process(job: dict, args, st: State, log: Log, gh_token: str | None) -> dict:
     json.dump(base, open(cfg_path, "w"))
     env = cli_env(args)
     rss = args.rss_limit_gb * 1024 ** 3
+    if args.corpus_only:
+        return process_corpus(job, args, jd, src, cfg_path, env, rss, lp, stats, rev, timed)
 
     def extract(out, mode_args, timeout):
         return run([args.cli, "extract", "--repo", src, "--config", cfg_path, "--out", out, "--overwrite", "--no-corpus",
@@ -427,6 +429,66 @@ def process(job: dict, args, st: State, log: Log, gh_token: str | None) -> dict:
             "samples": rows["samples"], "semantic": rows["semantic"]}
 
 
+def process_corpus(job, args, jd, src, cfg_path, env, rss, lp, stats, rev, timed) -> dict:
+    """Corpus pass: whole accepted files (same filters/licence/secret/generated/dedup rules), no caret extraction."""
+    out = os.path.join(jd, "corpus")
+    code, why = timed("discover", lambda: run([args.cli, "discover", "--repo", src, "--config", cfg_path, "--out", out, "--overwrite"],
+                                              env=env, timeout=args.syntax_timeout, rss_limit=rss, log_path=lp))
+    if code != 0:
+        return {"status": "failed", "reason": f"discover:{why or code}", "stats": stats, "revision": rev}
+    c = read_counters(out)
+    if not c.get("files.accepted"):
+        reason = "license_not_allowed" if c.get("files.skipped.license_not_allowed") else "no_accepted_files"
+        return {"status": "skipped", "reason": reason, "stats": stats, "revision": rev}
+    code, why = timed("validate", lambda: run([args.cli, "validate", "--dataset", out, "--repo", src], env=env,
+                                              timeout=args.syntax_timeout, rss_limit=rss, log_path=lp))
+    vpath = os.path.join(out, "validation.json")
+    failures = json.load(open(vpath))["report"]["failures"] if os.path.exists(vpath) else {"validator": 1}
+    hard = {k: v for k, v in failures.items() if k not in ("samples.missing",)}
+    if hard:
+        return {"status": "failed", "reason": "validation:" + ",".join(sorted(hard))[:300], "stats": stats, "revision": rev}
+    pending = os.path.join(args.out, "pending", slug(job["repo_id"]))
+    shutil.rmtree(pending, ignore_errors=True)
+    shutil.rmtree(pending + ".tmp", ignore_errors=True)
+    spec = json.dumps({"job": job, "rev": rev, "data_dir": out, "prompt_dir": "", "dest": pending + ".tmp", "corpus": True})
+    code, why = timed("pack", lambda: run([sys.executable, "-I", os.path.abspath(__file__), "--pack-job", spec, "--state", args.state],
+                                          timeout=args.syntax_timeout, rss_limit=rss, log_path=lp))
+    done = os.path.join(pending + ".tmp", "DONE")
+    if code != 0 or not os.path.exists(done):
+        return {"status": "failed", "reason": f"pack:{why or code}", "stats": stats, "revision": rev}
+    rows = json.load(open(done))
+    os.replace(pending + ".tmp", pending)
+    stats.update(rows)
+    stats["outcome"] = "complete"
+    stats["timings"]["total"] = round(sum(v for v in stats["timings"].values()), 1)
+    if not args.keep_work:
+        shutil.rmtree(jd, ignore_errors=True)
+    return {"status": "packed", "reason": None, "stats": stats, "revision": rev, "samples": rows["samples"], "semantic": 0}
+
+
+def pack_corpus(job, rev, data_dir, dest, st: State) -> dict:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    sc = schemas()["corpus"]
+    os.makedirs(dest, exist_ok=True)
+    rid = job["repo_id"]
+    rows, dup, nbytes = [], 0, 0
+    for r in jsonl(os.path.join(data_dir, "corpus.jsonl")):
+        st.x("INSERT OR IGNORE INTO file_owner(sha256, repo_id) VALUES(?,?)", (r["sha256"], rid))
+        if st.q("SELECT repo_id FROM file_owner WHERE sha256=?", (r["sha256"],))[0][0] != rid:
+            dup += 1
+            continue
+        r["revision"] = rev
+        r["license"] = job["license"]
+        nbytes += r.get("bytes") or 0
+        rows.append(pick(r, sc))
+    if rows:
+        pq.write_table(pa.Table.from_pylist(rows, schema=sc), os.path.join(dest, "corpus.parquet"), compression="zstd")
+    counts = {"samples": len(rows), "corpus_bytes": nbytes, "cross_repo_duplicate_files": dup, "semantic": 0, "prompts": 0}
+    open(os.path.join(dest, "DONE"), "w").write(json.dumps(counts))
+    return counts
+
+
 # ----------------------------------------------------------------------------------------------------------- parquet
 def schemas():
     import pyarrow as pa
@@ -458,7 +520,10 @@ def schemas():
     repos = pa.schema([("repository_id", s), ("revision", s), ("license", s), ("split", s), ("group", s), ("status", s),
                        ("outcome", s), ("reason", s), ("samples", pa.int64()), ("cs_bytes", pa.int64()), ("cs_files", pa.int64()),
                        ("keep_fraction", pa.float64()), ("test_keep_fraction", pa.float64()), ("processed_utc", s)])
-    return {"samples": samples, "semantic": semantic, "prompts": prompts, "repos": repos}
+    corpus = pa.schema([("repository_id", s), ("revision", s), ("license", s), ("relative_path", s), ("sha256", s),
+                        ("bytes", pa.int64()), ("has_bom", pa.bool_()), ("newline_style", s), ("project", s),
+                        ("is_test", pa.bool_()), ("lines", pa.int32()), ("content", s)])
+    return {"samples": samples, "semantic": semantic, "prompts": prompts, "repos": repos, "corpus": corpus}
 
 
 def jsonl(path):
@@ -531,13 +596,13 @@ def readme(st: State, args) -> str:
     rows = st.q("SELECT status, COUNT(*), SUM(samples) FROM jobs GROUP BY status")
     stats = {r[0]: {"repos": r[1], "samples": r[2] or 0} for r in rows}
     present = {}
-    for cfg in ("samples", "semantic", "prompts"):
+    for cfg in ("samples", "semantic", "prompts", "corpus"):
         present[cfg] = sorted({os.path.basename(p).split("-")[0] for p in REMOTE_FILES if p.startswith(f"data/{cfg}/")})
     lines = ["---", "license: other", "license_name: per-row-source-license",
              "license_link: LICENSE.md", "pretty_name: C# full-line completion (Roslyn caret samples)",
              "task_categories:", "- text-generation", "language:", "- code", "tags:", "- code", "- csharp", "- code-completion", "configs:"]
     first = True
-    for cfg, label in (("samples", "samples"), ("semantic", "semantic"), ("prompts", "prompts")):
+    for cfg, label in (("samples", "samples"), ("semantic", "semantic"), ("prompts", "prompts"), ("corpus", "corpus")):
         if not present[cfg]:
             continue
         lines += [f"- config_name: {label}"] + (["  default: true"] if first else []) + ["  data_files:"]
@@ -559,6 +624,7 @@ for attribution.
 | `semantic` | Roslyn facts computed on the target-free editor snapshot (`flc-semantic/v1`, editor_snapshot policy, safe adhoc tier) |
 | `prompts` | ready `flc-prompt/v2` pairs: `prompt` (special tokens as text) + `completion` ending with `<|eol|>`; loss on completion only |
 | `repos` | per-repository provenance and processing status |
+| `corpus` | whole accepted source files for causal pretraining (exact content, `has_bom`/`newline_style` recorded; same licence, generated-code, secret and cross-repository dedup rules) |
 
 Splits are assigned per repository group (forks/near-copies together); cross-repository duplicate files are kept once.
 No code was built or executed. See the builder repository for the data contract, leakage policy and benchmarks.
@@ -680,7 +746,7 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
     stage = os.path.join(args.out, "upload", f"batch-{bid:06d}")
     shutil.rmtree(stage, ignore_errors=True)
     counts = {}
-    for cfg in ("samples", "semantic", "prompts"):
+    for cfg in (("corpus",) if args.corpus_only else ("samples", "semantic", "prompts")):
         tables_by_split: dict[str, list] = {}
         for rid in repos:
             split = st.q("SELECT split FROM jobs WHERE repo_id=?", (rid,))[0][0]
@@ -704,9 +770,10 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
                       "samples": samples or 0, "cs_bytes": csb or 0, "cs_files": s.get("cs_files"),
                       "keep_fraction": s.get("keep_fraction"), "test_keep_fraction": s.get("test_keep_fraction"),
                       "processed_utc": now()})
-    out = os.path.join(stage, "data", "repos", f"repos-{args.run_tag}-{bid:06d}.parquet")
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    pq.write_table(pa.Table.from_pylist(rrows, schema=sc["repos"]), out, compression="zstd")
+    if not args.corpus_only:
+        out = os.path.join(stage, "data", "repos", f"repos-{args.run_tag}-{bid:06d}.parquet")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        pq.write_table(pa.Table.from_pylist(rrows, schema=sc["repos"]), out, compression="zstd")
     for root, _, files in os.walk(stage):
         for f in files:
             REMOTE_FILES.add(os.path.relpath(os.path.join(root, f), stage).replace(os.sep, "/"))
@@ -714,7 +781,9 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
         pick_examples(stage, args)
     except Exception as e:  # noqa: BLE001 - README examples are cosmetic
         log("readme_examples_error", error=str(e)[:200])
-    open(os.path.join(stage, "README.md"), "w").write(readme(st, args))
+    if not args.corpus_only:
+        refresh_remote_files(api, args)  # picks up configs uploaded by a parallel corpus pass
+        open(os.path.join(stage, "README.md"), "w").write(readme(st, args))
     open(os.path.join(stage, "LICENSE.md"), "w").write(LICENSE_MD)
     t_upload = time.time()
     stage_bytes = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(stage) for f in fs)
@@ -794,10 +863,12 @@ def main():
     ap.add_argument("--only", nargs="*", help="process only these repository ids")
     ap.add_argument("--keep-work", action="store_true")
     ap.add_argument("--keep-local", action="store_true")
+    ap.add_argument("--corpus-only", action="store_true", help="corpus pass: whole files only (no samples/semantic), config 'corpus'")
     args = ap.parse_args()
     if args.pack_job:
         spec = json.loads(args.pack_job)
-        counts = pack_repo(spec["job"], spec["rev"], spec["data_dir"], spec["prompt_dir"], spec["dest"], State(args.state), args)
+        counts = (pack_corpus(spec["job"], spec["rev"], spec["data_dir"], spec["dest"], State(args.state)) if spec.get("corpus")
+                  else pack_repo(spec["job"], spec["rev"], spec["data_dir"], spec["prompt_dir"], spec["dest"], State(args.state), args))
         print(json.dumps(counts))
         return
     if not args.manifest:
