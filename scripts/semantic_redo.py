@@ -171,39 +171,27 @@ def run_all(a, gh_token):
 
 
 # --------------------------------------------------------------------------------------------------------------- pack
-def pack(a, token):
-    """Stream the per-repository outputs into parquet (one writer per split, 50k-row batches): bounded memory."""
+def _pack_chunk(args):
+    """One chunk of repositories -> <split>-<chunk>.parquet files (bounded memory: 50k-row batches)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
+    k, items, work, dest = args
     sc = fr.schemas()["semantic"]
-    metas = {}
-    for line in open(os.path.join(a.work, "repos.jsonl")):
-        m = json.loads(line)
-        metas[m["repository_id"]] = m
-    dest = os.path.join(a.work, "upload", a.prefix + "semantic-fix")
-    shutil.rmtree(dest, ignore_errors=True)
-    os.makedirs(dest)
-    writers, buffers, counts, parts = {}, {}, collections.Counter(), collections.Counter()
+    writers, buf, counts = {}, {}, collections.Counter()
 
-    def flush(split, final=False):
-        rows = buffers.get(split) or []
-        if not rows:
+    def flush(split):
+        if not buf.get(split):
             return
-        w = writers.get(split)
-        if w is None or (w is not None and counts[split] >= 500_000 * (parts[split])):
-            if w is not None:
-                w.close()
-            w = writers[split] = pq.ParquetWriter(os.path.join(dest, f"{split}-{parts[split]:04d}.parquet"), sc, compression="zstd")
-            parts[split] += 1
-        w.write_table(pa.Table.from_pylist(rows, schema=sc))
-        counts[split] += len(rows)
-        buffers[split] = []
+        if split not in writers:
+            writers[split] = pq.ParquetWriter(os.path.join(dest, f"{split}-{k:04d}.parquet"), sc, compression="zstd")
+        writers[split].write_table(pa.Table.from_pylist(buf[split], schema=sc))
+        counts[split] += len(buf[split])
+        buf[split] = []
 
-    for rid, m in sorted(metas.items()):
-        p = os.path.join(a.work, "out", fr.slug(rid) + ".jsonl")
+    for rid, split in items:
+        p = os.path.join(work, "out", fr.slug(rid) + ".jsonl")
         if not os.path.exists(p):
             continue
-        split = m["split"]
         for line in open(p):
             r = json.loads(line)
             if r.get("visibility_policy") != "editor_snapshot":
@@ -212,13 +200,32 @@ def pack(a, token):
             lk = r.get("leakage") or {}
             r["target_identifiers"] = lk.get("target_identifiers")
             r["covered_target_identifiers"] = lk.get("covered_target_identifiers")
-            buffers.setdefault(split, []).append(fr.pick(r, sc))
-            if len(buffers[split]) >= 50_000:
+            buf.setdefault(split, []).append(fr.pick(r, sc))
+            if len(buf[split]) >= 50_000:
                 flush(split)
-    for split in list(buffers):
+    for split in list(buf):
         flush(split)
     for w in writers.values():
         w.close()
+    return counts
+
+
+def pack(a, token):
+    """Parallel streaming pack: repositories in --jobs chunks, one parquet file per (split, chunk)."""
+    metas = {}
+    for line in open(os.path.join(a.work, "repos.jsonl")):
+        m = json.loads(line)
+        metas[m["repository_id"]] = m["split"]
+    dest = os.path.join(a.work, "upload", a.prefix + "semantic-fix")
+    shutil.rmtree(dest, ignore_errors=True)
+    os.makedirs(dest)
+    items = sorted(metas.items())
+    n = max(1, min(a.jobs, len(items)))
+    chunks = [(k, items[k::n], a.work, dest) for k in range(n)]
+    counts = collections.Counter()
+    with cf.ProcessPoolExecutor(n) as pool:
+        for c in pool.map(_pack_chunk, chunks):
+            counts.update(c)
     json.dump({"records": dict(counts), "reason": "extractor fixes: partly typed member name after '.', capped-list ranking, "
                "duplicate ProjectReference"}, open(os.path.join(dest, "summary.json"), "w"), indent=1)
     log(event="packed", **dict(counts))

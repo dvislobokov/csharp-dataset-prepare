@@ -173,20 +173,30 @@ def load_inputs(a):
     need_ids = {r["sample_id"] for r in picked}
     need_repos = {r["repository_id"] for r in picked}
     # semantic: data/semantic of the same shards + semantic-fix overrides
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    need_arr = pa.array(sorted(need_ids))
+
+    def wanted(path):
+        """Only the rows of the sampled positions (filtered in Arrow before any Python objects are made)."""
+        t = pq.read_table(path)
+        return t.filter(pc.is_in(t.column("sample_id"), value_set=need_arr)).to_pylist()
+
     sems = {}
     for n in scanned:
         m = n.replace("/samples/", "/semantic/")
         if m not in files:
             continue
-        for r in pq.read_table(dl(m)).to_pylist():
-            if r["sample_id"] in need_ids and r["visibility_policy"] == "editor_snapshot":
+        for r in wanted(dl(m)):
+            if r["visibility_policy"] == "editor_snapshot":
                 sems[r["sample_id"]] = r
     fixes = 0
-    for m in sorted(f for f in files if f.startswith(pre + "semantic-fix/") and f.endswith(".parquet")):
-        for r in pq.read_table(dl(m)).to_pylist():
-            if r["sample_id"] in need_ids:
-                sems[r["sample_id"]] = r
-                fixes += 1
+    fix_files = (sorted(glob.glob(os.path.join(a.fix_dir, "*.parquet"))) if a.fix_dir else
+                 [dl(m) for m in sorted(f for f in files if f.startswith(pre + "semantic-fix/") and f.endswith(".parquet"))])
+    for m in fix_files:
+        for r in wanted(m):
+            sems[r["sample_id"]] = r
+            fixes += 1
     log(event="semantic", records=len(sems), fixed=fixes)
     # file texts
     need_files = {(r["repository_id"], r["relative_path"], r["source_sha256"]) for r in picked}
@@ -242,6 +252,7 @@ def main():
     ap.add_argument("--kinds", nargs="*", default=[])
     ap.add_argument("--per-repo", type=int, default=40, help="max sampled positions per repository")
     ap.add_argument("--exclude", help="JSONL with repository_id/relative_path to skip (decontam near_duplicates)")
+    ap.add_argument("--fix-dir", help="local dir with semantic-fix parquet files (instead of downloading them)")
     ap.add_argument("--corpus-dir", help="local dir with the corpus parquet files (instead of downloading them)")
     ap.add_argument("--deps-dir", help="local dir with deps file_roots.parquet / repo_roots.parquet")
     ap.add_argument("--eval", action="store_true")
