@@ -70,6 +70,7 @@ def record(n: dict) -> dict:
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--language", default="C#", help="GitHub language qualifier, e.g. C# or Go")
     ap.add_argument("--stars", required=True, help="GitHub range, e.g. 0..4")
     ap.add_argument("--out", required=True)
     ap.add_argument("--pushed-since", default="2024-10-09")
@@ -77,7 +78,7 @@ def main():
     ap.add_argument("--min-interval", type=float, default=1.0, help="seconds between API calls")
     args = ap.parse_args()
     gh = GitHub(open(args.token_file).read().strip(), args.min_interval)
-    base = f"language:C# fork:false archived:false pushed:>={args.pushed_since} stars:{args.stars}"
+    base = f"language:{args.language} fork:false archived:false pushed:>={args.pushed_since} stars:{args.stars}"
     done_path = args.out + ".slices"
     done = set(open(done_path).read().split("\n")) if os.path.exists(done_path) else set()
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
