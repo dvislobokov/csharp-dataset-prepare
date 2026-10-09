@@ -42,6 +42,13 @@ public static class SemanticAnalyzer
     };
 
     /// <summary>Convenience overload (tests, one-off use): builds the per-file context on every call.</summary>
+    /// <summary>
+    /// UTF-16 window of the "already used in the prefix" ranking: the 20 000 chars before the start of the caret's line.
+    /// Text of the current line is excluded, because the hidden target completes identifiers that start on it.
+    /// </summary>
+    public static (int Start, int End) RankingWindow(FlcSampleRecord sample) =>
+        (Math.Max(0, sample.LineStartUtf16Offset - 20000), sample.LineStartUtf16Offset);
+
     public static async Task<SemanticRecord> AnalyzeAsync(Document original, FlcSampleRecord sample, string policy, SemanticConfig cfg, CancellationToken ct) =>
         await AnalyzeAsync(await FileSemanticContext.CreateAsync(original, ct), sample, policy, cfg, ct);
 
@@ -132,7 +139,10 @@ public static class SemanticAnalyzer
         IEnumerable<ISymbol> Members(INamespaceOrTypeSymbol container, bool ext) =>
             anchor is { } a ? ctx.LookupMembers(a.Pos, container, ext) : model.LookupSymbols(qpos, container, includeReducedExtensionMethods: ext);
         // Names already typed in the visible prefix rank first when lists must be capped (like IDE "recently used" ranking).
-        bool InPrefix(string name) => ctx.OccursIn(name.TrimStart('@'), Math.Max(0, pos - 20000), pos);
+        // The window ends at the start of the caret's line: the identifier index is built from the ORIGINAL file, so an
+        // identifier that starts before the caret and is completed by the hidden target would otherwise count as typed.
+        var (rankStart, rankEnd) = RankingWindow(sample);
+        bool InPrefix(string name) => ctx.OccursIn(name.TrimStart('@'), rankStart, rankEnd);
 
         var declaredHere = new HashSet<string>(StringComparer.Ordinal);
         // Seeds for the TYPE block: types of facts already derived from the snapshot/prefix (never from the target).
@@ -261,16 +271,28 @@ public static class SemanticAnalyzer
         ExpressionSyntax? receiverExpr = null;
         using (SemanticProfile.Measure("receiver." + b.Engine))
         {
+            // The access node: right after the dot, or with the caret inside the partly typed member name (`obj.Na⟨⟩`). The
+            // receiver expression is left of the dot, i.e. fully typed in both cases; the member list is all accessible members.
+            SyntaxNode? access = null;
             if (tokenBefore.IsKind(SyntaxKind.DotToken) && tokenBefore.Span.End == pos)
-            {
-                receiverExpr = tokenBefore.Parent switch
+                access = tokenBefore.Parent;
+            else if (tokenBefore.IsKind(SyntaxKind.IdentifierToken) && tokenBefore.SpanStart < pos && pos <= tokenBefore.Span.End
+                     && tokenBefore.Parent is SimpleNameSyntax typedName)
+                access = typedName.Parent switch
                 {
-                    MemberAccessExpressionSyntax ma => ma.Expression,
-                    MemberBindingExpressionSyntax mb => mb.FirstAncestorOrSelf<ConditionalAccessExpressionSyntax>()?.Expression,
-                    QualifiedNameSyntax qn => qn.Left,
+                    MemberAccessExpressionSyntax ma when ma.Name == typedName => ma,
+                    MemberBindingExpressionSyntax mb when mb.Name == typedName => mb,
+                    QualifiedNameSyntax qn when qn.Right == typedName => qn,
                     _ => null,
                 };
-            }
+            bool viaBinding = access is MemberBindingExpressionSyntax;
+            receiverExpr = access switch
+            {
+                MemberAccessExpressionSyntax ma => ma.Expression,
+                MemberBindingExpressionSyntax mb => mb.FirstAncestorOrSelf<ConditionalAccessExpressionSyntax>()?.Expression,
+                QualifiedNameSyntax qn => qn.Left,
+                _ => null,
+            };
             if (receiverExpr is not null)
             {
                 var symbol = SymInfo(receiverExpr).Symbol;
@@ -285,8 +307,10 @@ public static class SemanticAnalyzer
                 else
                 {
                     var t = TypeOf(receiverExpr);
-                    if (t is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable && tokenBefore.Parent is MemberBindingExpressionSyntax)
+                    if (t is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable && viaBinding)
                         t = nullable.TypeArguments[0];
+                    else if (viaBinding && t is { IsReferenceType: true, NullableAnnotation: NullableAnnotation.Annotated })
+                        t = t.WithNullableAnnotation(NullableAnnotation.NotAnnotated); // inside `?.` the receiver is not null
                     if (t is not null && t.TypeKind != TypeKind.Error && !LaterInDoc(t)) { container = t; receiverKind = "instance"; receiverType = Min(t); }
                     else reason = "unresolved_receiver_type";
                 }

@@ -89,7 +89,9 @@ public sealed class SemanticEnricher(ISemanticDocumentSource source, DatasetConf
         LatencyRecorder latency, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(config.Semantic.TimeoutMs);
+        // CancelAfter(0) fires on a timer thread, so a fast analysis could still finish; a non-positive budget cancels now.
+        if (config.Semantic.TimeoutMs <= 0) cts.Cancel();
+        else cts.CancelAfter(config.Semantic.TimeoutMs);
         var sw = Stopwatch.StartNew();
         try
         {

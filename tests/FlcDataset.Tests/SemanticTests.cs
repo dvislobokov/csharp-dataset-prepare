@@ -52,6 +52,34 @@ public class SemanticTests : IDisposable
     }
 
     [Fact]
+    public async Task RankingWindowEndsAtLineStartSoThePartlyTypedNameDoesNotCount()
+    {
+        // `GetByIdAsync` first occurs on the caret line; with the caret inside it, the old window [pos - 20000, pos)
+        // counted the original identifier (completed by the hidden target) as "already used in the prefix".
+        var caret = TestUtil.After(_service.Text, "repository.GetBy");
+        var sample = TestUtil.SampleAt(_service, ServicePath, caret, "identifier_partial");
+        var ctx = await FileSemanticContext.CreateAsync(_source.Find(ServicePath, out _)!, default);
+        Assert.True(ctx.OccursIn("GetByIdAsync", Math.Max(0, caret - 20000), caret)); // the leak the window must avoid
+        var (start, end) = SemanticAnalyzer.RankingWindow(sample);
+        Assert.Equal(sample.LineStartUtf16Offset, end);
+        Assert.False(ctx.OccursIn("GetByIdAsync", start, end));
+        Assert.True(ctx.OccursIn("repository", start, end)); // the primary constructor parameter is genuinely in the prefix
+    }
+
+    [Theory]
+    [InlineData("repository.GetBy", "IOrderRepository", "GetByIdAsync")]
+    [InlineData("order?.Cust", "Order", "Customer")]
+    public async Task PartlyTypedMemberNameStillReportsReceiverAndMembers(string marker, string receiver, string member)
+    {
+        var caret = TestUtil.After(_service.Text, marker);
+        var r = await At(caret, kind: "identifier_partial");
+        Assert.Equal(receiver, r.ReceiverType);
+        Assert.Equal("instance", r.ReceiverKind);
+        Assert.Contains(member, Names(r.Members)); // legitimate: an accessible member of the typed receiver
+        Assert.Empty(r.Leakage!.Violations);
+    }
+
+    [Fact]
     public async Task VarTypeIsResolvedFromInference()
     {
         var caret = TestUtil.After(_service.Text, "int count", atStart: true);
