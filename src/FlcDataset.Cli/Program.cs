@@ -46,14 +46,15 @@ Option<int> WorkersOpt() => new("--workers") { Description = "Bounded worker cou
     source.AcceptOnlyFromAmong("msbuild", "adhoc");
     var solution = new Option<string?>("--solution") { Description = "Solution/filter/project relative to repo (default: config semantic.solution)" };
     var fraction = new Option<double?>("--semantic-fraction") { Description = "Override semantic.subset_fraction (1.0 = all samples)" };
+    var noCorpus = new Option<bool>("--no-corpus") { Description = "Do not write corpus.jsonl (whole-file pretraining corpus)" };
     var engine = new Option<string?>("--semantic-engine") { Description = "Override semantic.engine: auto (speculative member binding, fork fallback) | fork" };
     engine.AcceptOnlyFromAmong("auto", "fork");
-    var cmd = new Command("extract", "E1–E3: extract corpus + FLC samples, optionally with semantic enrichment") { repo, cfg, outo, ow, gz, workers, mode, trusted, source, solution, fraction, engine };
+    var cmd = new Command("extract", "E1–E3: extract corpus + FLC samples, optionally with semantic enrichment") { repo, cfg, outo, ow, gz, workers, mode, trusted, source, solution, fraction, engine, noCorpus };
     cmd.SetAction((pr, ct) => Commands.Extract(new ExtractArgs
     {
         Repo = pr.GetValue(repo)!, Config = pr.GetValue(cfg)!, Out = pr.GetValue(outo)!, Overwrite = pr.GetValue(ow), Gzip = pr.GetValue(gz),
         Mode = pr.GetValue(mode)!, Workers = pr.GetValue(workers), Trusted = pr.GetValue(trusted), SemanticSource = pr.GetValue(source)!,
-        Solution = pr.GetValue(solution), SemanticFraction = pr.GetValue(fraction), SemanticEngine = pr.GetValue(engine),
+        Solution = pr.GetValue(solution), SemanticFraction = pr.GetValue(fraction), SemanticEngine = pr.GetValue(engine), NoCorpus = pr.GetValue(noCorpus),
     }, ct));
     root.Subcommands.Add(cmd);
 }
@@ -151,6 +152,7 @@ namespace FlcDataset.Cli
         public string? Solution { get; init; }
         public double? SemanticFraction { get; init; }
         public string? SemanticEngine { get; init; }
+        public bool NoCorpus { get; init; }
     }
 
     public static class Commands
@@ -241,6 +243,7 @@ namespace FlcDataset.Cli
                 {
                     RepoPath = a.Repo, OutputDir = tmp, Config = config, Mode = a.Mode, Workers = a.Workers, Gzip = a.Gzip,
                     ExtractSamples = a.Mode != "discover",
+                    WriteCorpus = !a.NoCorpus,
                     Enricher = source is null ? null : new SemanticEnricher(source, config, a.Mode),
                     Log = log, PreStageTimingsMs = pre, SemanticEnvironment = semEnv,
                 }, ct);

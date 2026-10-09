@@ -197,6 +197,7 @@ public static class ExtractionPipeline
         var exclusionPerReason = new Dictionary<string, int>(StringComparer.Ordinal);
         var dupKeys = new HashSet<string>(StringComparer.Ordinal);
         var perProject = new Dictionary<string, int>(StringComparer.Ordinal);
+        long admittedTotal = 0;
         var byProject = new SortedDictionary<string, SortedDictionary<string, long>>(StringComparer.Ordinal);
         long acceptedBytes = 0, acceptedChars = 0, acceptedLines = 0, targetChars = 0, duplicates = 0;
         var admitSw = new Stopwatch();
@@ -258,9 +259,14 @@ public static class ExtractionPipeline
                                 duplicates++;
                                 if (cfg.Sampling.DropDuplicateLineTargets) { counters.Add("samples.dropped_duplicate"); continue; }
                             }
+                            var keep = cfg.Sampling.KeepFraction * (sample.IsTest ? cfg.Sampling.TestKeepFraction : 1.0);
+                            if (keep < 1.0 && Hashing.Uniform(cfg.Seed.ToString(), "keep", sample.SampleId) >= keep)
+                            { counters.Add(sample.IsTest ? "samples.dropped_thinning_test" : "samples.dropped_thinning"); continue; }
+                            if (cfg.Sampling.MaxSamplesPerRepo > 0 && admittedTotal >= cfg.Sampling.MaxSamplesPerRepo) { counters.Add("samples.dropped_repo_cap"); continue; }
                             var projKey = sample.Project ?? "(none)";
                             var pc = perProject.GetValueOrDefault(projKey);
                             if (cfg.Sampling.MaxSamplesPerProject > 0 && pc >= cfg.Sampling.MaxSamplesPerProject) { counters.Add("samples.dropped_project_cap"); continue; }
+                            admittedTotal++;
                             perProject[projKey] = pc + 1;
                             kept.Add(sample);
                         }

@@ -7,3 +7,6 @@ workspaces/
 __pycache__/
 *.pyc
 *.partial
+HF_TOKEN
+.env
+GITHUB_TOKEN

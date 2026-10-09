@@ -65,6 +65,15 @@ public sealed record SamplingConfig
     public int MaxSamplesPerFile { get; init; } = 300;
     /// <summary>0 = unlimited.</summary>
     public int MaxSamplesPerProject { get; init; }
+    /// <summary>
+    /// Deterministic, repository-wide thinning applied after dedup: a sample is kept when
+    /// uniform(seed, "keep", sample_id) &lt; keep_fraction (× test_keep_fraction for test code). Unlike caps, it does not
+    /// favour files that come first in path order. Used by the bulk orchestrator to reach a per-repository budget.
+    /// </summary>
+    public double KeepFraction { get; init; } = 1.0;
+    public double TestKeepFraction { get; init; } = 1.0;
+    /// <summary>Hard safety cap per repository after thinning (0 = unlimited).</summary>
+    public int MaxSamplesPerRepo { get; init; }
     /// <summary>Identifier internal offsets considered per identifier (1..N typed chars, plus camel-hump boundaries).</summary>
     public int IdentifierPrefixMax { get; init; } = 4;
     public int MaxLineChars { get; init; } = 240;
@@ -95,6 +104,12 @@ public sealed record SplitConfig
     public double TestFraction { get; init; } = 0.0;
     /// <summary>Explicit overrides: group key -> split.</summary>
     public Dictionary<string, string> Overrides { get; init; } = new();
+    /// <summary>
+    /// Bulk mode: the whole repository goes to this split under <see cref="RepositoryGroup"/> (assigned upstream per
+    /// repository/fork group so near-copies never straddle splits). Null = per-group assignment inside the repository.
+    /// </summary>
+    public string? RepositorySplit { get; init; }
+    public string? RepositoryGroup { get; init; }
 }
 
 public sealed record SemanticConfig

@@ -211,3 +211,68 @@ public class LicenseDetectionTests
         Assert.Equal(spdx is not null, info.Allowed);
     }
 }
+
+public class BulkModeTests
+{
+    [Fact]
+    public async Task ThinningIsDeterministicRepositoryWideAndSplitIsForced()
+    {
+        var baseCfg = TestUtil.AllCarets();
+        async Task<(RunSummary S, List<FlcSampleRecord> Samples)> Run(DatasetConfig cfg)
+        {
+            var dir = TestUtil.TempDir();
+            var r = await ExtractionPipeline.RunAsync(new PipelineOptions { RepoPath = TestUtil.FixtureRepo, OutputDir = dir, Config = cfg, Workers = 2, WriteCorpus = false }, TestContext.Current.CancellationToken);
+            Assert.False(File.Exists(Path.Combine(dir, "corpus.jsonl")));
+            return (r.Summary, Jsonl.Read<FlcSampleRecord>(Path.Combine(dir, "samples.jsonl")).ToList());
+        }
+        var full = await Run(baseCfg);
+        var thin = await Run(baseCfg with
+        {
+            Sampling = baseCfg.Sampling with { KeepFraction = 0.5, TestKeepFraction = 0.0, MaxSamplesPerRepo = 100000 },
+            Split = new SplitConfig { RepositorySplit = "eval", RepositoryGroup = "grp_fixture" },
+        });
+        var thin2 = await Run(baseCfg with
+        {
+            Sampling = baseCfg.Sampling with { KeepFraction = 0.5, TestKeepFraction = 0.0, MaxSamplesPerRepo = 100000 },
+            Split = new SplitConfig { RepositorySplit = "eval", RepositoryGroup = "grp_fixture" },
+        });
+        Assert.Equal(thin.Samples.Select(s => s.SampleId), thin2.Samples.Select(s => s.SampleId));
+        Assert.All(thin.Samples, s => Assert.False(s.IsTest));
+        Assert.All(thin.Samples, s => { Assert.Equal("eval", s.Split); Assert.Equal("grp_fixture", s.SplitGroup); });
+        var nonTest = full.Samples.Count(s => !s.IsTest);
+        Assert.InRange(thin.Samples.Count, nonTest * 0.35, nonTest * 0.65);
+        Assert.Subset(full.Samples.Select(s => s.SampleId).ToHashSet(), thin.Samples.Select(s => s.SampleId).ToHashSet());
+        // Every source file keeps roughly its share (no path-order bias): the last file in order still has samples.
+        var lastFile = full.Samples.Where(s => !s.IsTest).Select(s => s.RelativePath).Max(StringComparer.Ordinal);
+        Assert.Contains(thin.Samples, s => s.RelativePath == lastFile);
+
+        var capped = await Run(baseCfg with { Sampling = baseCfg.Sampling with { MaxSamplesPerRepo = 10 } });
+        Assert.Equal(10, capped.Samples.Count);
+        Assert.True(capped.S.Samples["dropped_repo_cap"] > 0);
+    }
+}
+
+public class LicenseFallbackTests
+{
+    [Theory]
+    [InlineData("License.md", "Microsoft Public License (Ms-PL)\nThis license governs use of the accompanying software.", "MS-PL", "MS-PL", true)]
+    [InlineData("LICENSE.MIT", "Permission is hereby granted, free of charge, to any person...\nTHE SOFTWARE IS PROVIDED \"AS IS\"", null, "MIT", true)]
+    [InlineData("COPYING", "All rights reserved.", null, null, false)]
+    [InlineData("UNLICENSE", "This is free and unencumbered software released into the public domain.", "Unlicense", "Unlicense", true)]
+    [InlineData("LICENSE", "Permission is hereby granted, free of charge...\nTHE SOFTWARE IS PROVIDED \"AS IS\"", "Apache-2.0", null, false)]
+    public void UnrecognizedTextFallsBackToDeclaredOnlyWithLicenseFile(string fileName, string text, string? declared, string? spdx, bool allowed)
+    {
+        var dir = TestUtil.TempDir();
+        File.WriteAllText(Path.Combine(dir, fileName), text);
+        var info = RepositoryInfo.DetectLicense(dir, new LicenseConfig { Declared = declared, Allowlist = ["MIT", "Apache-2.0", "MS-PL", "Unlicense"] });
+        Assert.Equal(spdx, info.Spdx);
+        Assert.Equal(allowed, info.Allowed);
+    }
+
+    [Fact]
+    public void DeclaredLicenseWithoutLicenseFileIsNotAccepted()
+    {
+        var info = RepositoryInfo.DetectLicense(TestUtil.TempDir(), new LicenseConfig { Declared = "MIT" });
+        Assert.False(info.Allowed);
+    }
+}

@@ -141,6 +141,7 @@ public sealed class Discoverer
     public (string Split, string Group) SplitOf(string rel)
     {
         var s = _config.Split;
+        if (s.RepositorySplit is { } repoSplit) return (repoSplit, s.RepositoryGroup ?? _repo.RepositoryId);
         var project = ProjectOf(rel);
         var group = s.GroupBy switch
         {

@@ -58,8 +58,11 @@ public sealed record RepositoryInfo
     /// <summary>Conservative license detection from the root LICENSE file text. Unknown is never upgraded to allowed silently.</summary>
     public static LicenseInfo DetectLicense(string root, LicenseConfig cfg)
     {
-        string[] names = ["LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "COPYING", "license.md", "License.txt"];
-        var file = names.Select(n => Path.Combine(root, n)).FirstOrDefault(File.Exists);
+        // LICENSE, License.md, LICENCE.txt, COPYING, LICENSE.MIT ... (case-insensitive, repository root only).
+        var file = Directory.EnumerateFiles(root)
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(f), @"^((un)?licen[cs]e|copying)([.-][\w.-]*)?$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+            .OrderBy(f => Path.GetFileName(f).Length).ThenBy(f => f, StringComparer.Ordinal).FirstOrDefault();
         string? detected = null;
         string reason;
         if (file is null) reason = "no_license_file";
@@ -71,6 +74,8 @@ public sealed record RepositoryInfo
                 detected = "MIT";
             else if (text.Contains("Apache License", StringComparison.Ordinal) && text.Contains("Version 2.0", StringComparison.Ordinal))
                 detected = "Apache-2.0";
+            else if (text.Contains("This is free and unencumbered software released into the public domain", StringComparison.OrdinalIgnoreCase))
+                detected = "Unlicense";
             else if (text.Contains("Redistribution and use in source and binary forms", StringComparison.Ordinal)
                      && text.Contains("THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\"", StringComparison.OrdinalIgnoreCase))
                 detected = text.Contains("Neither the name", StringComparison.OrdinalIgnoreCase) ? "BSD-3-Clause" : "BSD-2-Clause";
@@ -79,6 +84,14 @@ public sealed record RepositoryInfo
         if (cfg.Declared is not null && detected is not null && cfg.Declared != detected)
             return new LicenseInfo(null, $"declared_{cfg.Declared}_conflicts_with_detected_{detected}", file, false);
         var spdx = detected;
+        // The text detector only knows a few license families. When it cannot recognise the text but a license file exists
+        // and the manifest declares an allowlisted license (e.g. from the hosting platform's license detection), accept the
+        // declaration and say so explicitly in the reason.
+        if (spdx is null && file is not null && cfg.Declared is not null && cfg.Allowlist.Contains(cfg.Declared))
+        {
+            spdx = cfg.Declared;
+            reason = $"declared:{cfg.Declared};license_file_present:{Path.GetFileName(file)};text_unrecognized";
+        }
         return new LicenseInfo(spdx, reason, file is null ? null : Path.GetFileName(file), spdx is not null && cfg.Allowlist.Contains(spdx));
     }
 
