@@ -1,3 +1,4 @@
+using FlcDataset.Cli;
 using FlcDataset.Core;
 using FlcDataset.Extraction;
 
@@ -193,5 +194,23 @@ public class SecretRuleTests
         Assert.DoesNotContain(r.Samples, s => s.TargetText.Contains("Pass@word1234"));
         var withKey = TestUtil.Extract(text, cfg);
         Assert.DoesNotContain(withKey.Samples, s => s.TargetText.Contains("AKIA"));
+    }
+}
+
+public class UnicodeWhitespaceTests
+{
+    [Fact]
+    public async Task NonBreakingSpaceIndentationPassesSchemaAndReconstruction()
+    {
+        var dir = TestUtil.TempDir();
+        File.WriteAllText(Path.Combine(dir, "LICENSE"), "Permission is hereby granted, free of charge...\nTHE SOFTWARE IS PROVIDED \"AS IS\"");
+        File.WriteAllText(Path.Combine(dir, "A.cs"), "class A\n{\n    void M(int x)\n    {\n　　return;\n    }\n}\n");
+        var cfg = TestUtil.AllCarets() with { RepositoryId = "fixture/nbsp", Discovery = new DiscoveryConfig { Include = ["**/*.cs"] } };
+        var outDir = TestUtil.TempDir();
+        await ExtractionPipeline.RunAsync(new PipelineOptions { RepoPath = dir, OutputDir = outDir, Config = cfg }, TestContext.Current.CancellationToken);
+        DatasetValidator.SchemaDirectory = Path.Combine(AppContext.BaseDirectory, "schemas");
+        var report = new DatasetValidator().Validate(outDir, dir);
+        Assert.True(report.Ok, string.Join("\n", report.FailureExamples));
+        Assert.Contains(Jsonl.Read<FlcSampleRecord>(Path.Combine(outDir, "samples.jsonl")), s => s.Indentation == "    ");
     }
 }

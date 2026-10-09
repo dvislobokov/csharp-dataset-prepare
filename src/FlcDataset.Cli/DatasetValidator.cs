@@ -21,7 +21,8 @@ public sealed record ValidationReport
 /// </summary>
 public sealed class DatasetValidator
 {
-    static readonly ConcurrentDictionary<string, JsonSchema> Schemas = new();
+    // Lazy: GetOrAdd may run a factory twice under contention, and JsonSchema registers each $id globally exactly once.
+    static readonly ConcurrentDictionary<string, Lazy<JsonSchema>> Schemas = new();
     readonly SortedDictionary<string, long> _checked = new(StringComparer.Ordinal);
     readonly SortedDictionary<string, long> _failures = new(StringComparer.Ordinal);
     readonly List<string> _examples = [];
@@ -29,7 +30,8 @@ public sealed class DatasetValidator
 
     public static string SchemaDirectory { get; set; } = Path.Combine(AppContext.BaseDirectory, "schemas");
 
-    static JsonSchema Schema(string file) => Schemas.GetOrAdd(file, f => JsonSchema.FromText(File.ReadAllText(Path.Combine(SchemaDirectory, f))));
+    static JsonSchema Schema(string file) =>
+        Schemas.GetOrAdd(file, f => new Lazy<JsonSchema>(() => JsonSchema.FromText(File.ReadAllText(Path.Combine(SchemaDirectory, f))))).Value;
 
     void Check(string name) => _checked[name] = _checked.GetValueOrDefault(name) + 1;
 

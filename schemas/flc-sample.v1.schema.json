@@ -5,43 +5,236 @@
   "description": "All *_utf16_offset values are UTF-16 code-unit offsets into the decoded file text with any UTF-8 BOM removed (Roslyn-compatible). *_byte_offset values are byte offsets into the original file bytes (BOM included). Lines and columns are zero-based; columns are UTF-16 code units from the physical line start. Line breaks follow Roslyn: CRLF, CR, LF, U+0085, U+2028, U+2029. Invariant: text[caret..target_end] == target_text and text == text[..caret] + target_text + text[target_end..]. target_text never contains a line break and excludes trailing whitespace of the line (that whitespace starts right_context). For supervised FLC serialize target_text followed by a dedicated <EOL> stop token.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version","sample_id","repository_id","revision","relative_path","project","is_test","source_sha256","caret_utf16_offset","caret_line_zero_based","caret_column_utf16_zero_based","caret_byte_offset","target_end_utf16_offset","target_end_byte_offset","line_start_utf16_offset","line_end_utf16_offset","caret_kind","caret_subkind","tags","left_context_start_utf16_offset","left_context_truncated","left_context","target_text","right_context","right_context_end_utf16_offset","right_context_truncated","end_of_line","indentation","quality_flags","split","split_group","semantic_status","semantic_reason","config_version","config_sha256","generator"],
+  "required": [
+    "schema_version",
+    "sample_id",
+    "repository_id",
+    "revision",
+    "relative_path",
+    "project",
+    "is_test",
+    "source_sha256",
+    "caret_utf16_offset",
+    "caret_line_zero_based",
+    "caret_column_utf16_zero_based",
+    "caret_byte_offset",
+    "target_end_utf16_offset",
+    "target_end_byte_offset",
+    "line_start_utf16_offset",
+    "line_end_utf16_offset",
+    "caret_kind",
+    "caret_subkind",
+    "tags",
+    "left_context_start_utf16_offset",
+    "left_context_truncated",
+    "left_context",
+    "target_text",
+    "right_context",
+    "right_context_end_utf16_offset",
+    "right_context_truncated",
+    "end_of_line",
+    "indentation",
+    "quality_flags",
+    "split",
+    "split_group",
+    "semantic_status",
+    "semantic_reason",
+    "config_version",
+    "config_sha256",
+    "generator"
+  ],
   "properties": {
-    "schema_version": { "const": "flc-sample/v1" },
-    "sample_id": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "sha256(repository_id, relative_path, source_sha256, caret_utf16_offset, target_end_utf16_offset)[:32]" },
-    "repository_id": { "type": "string", "minLength": 1 },
-    "revision": { "type": ["string","null"], "pattern": "^[0-9a-f]{40}$", "description": "Full git commit SHA; null only when the input is not a git checkout." },
-    "relative_path": { "type": "string", "minLength": 1, "description": "'/'-separated path relative to the repository root." },
-    "project": { "type": ["string","null"] },
-    "is_test": { "type": "boolean" },
-    "source_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the exact original file bytes." },
-    "caret_utf16_offset": { "type": "integer", "minimum": 0 },
-    "caret_line_zero_based": { "type": "integer", "minimum": 0 },
-    "caret_column_utf16_zero_based": { "type": "integer", "minimum": 0 },
-    "caret_byte_offset": { "type": "integer", "minimum": 0 },
-    "target_end_utf16_offset": { "type": "integer", "minimum": 0 },
-    "target_end_byte_offset": { "type": "integer", "minimum": 0 },
-    "line_start_utf16_offset": { "type": "integer", "minimum": 0 },
-    "line_end_utf16_offset": { "type": "integer", "minimum": 0, "description": "End of line content, excluding the line break." },
-    "caret_kind": { "enum": ["line_start","identifier_partial","member_access","argument_list","after_keyword","after_operator","control_flow","lambda_body","linq","log_message","token_boundary"] },
-    "caret_subkind": { "type": ["string","null"] },
-    "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-    "left_context_start_utf16_offset": { "type": "integer", "minimum": 0 },
-    "left_context_truncated": { "type": "boolean" },
-    "left_context": { "type": "string", "description": "text[left_context_start..caret]; at most context.left_chars UTF-16 units; never splits a surrogate pair." },
-    "target_text": { "type": "string", "minLength": 1, "pattern": "^[^\\r\\n\\u0085\\u2028\\u2029]*$" },
-    "right_context": { "type": "string", "description": "text[target_end..right_context_end]; starts immediately after target_text (trailing whitespace, then the line break if present). Stored for FIM research; not a default model feature." },
-    "right_context_end_utf16_offset": { "type": "integer", "minimum": 0 },
-    "right_context_truncated": { "type": "boolean" },
-    "end_of_line": { "enum": ["LF","CRLF","CR","OTHER","EOF"] },
-    "indentation": { "type": "string", "pattern": "^[^\\S\\r\\n]*$" },
-    "quality_flags": { "type": "array", "items": { "enum": ["trivial_target","target_starts_with_whitespace","target_starts_with_closer","trailing_whitespace","target_has_comment","file_has_syntax_errors","non_ascii_target"] }, "uniqueItems": true },
-    "split": { "enum": ["train","eval","test","pilot"] },
-    "split_group": { "type": "string" },
-    "semantic_status": { "enum": ["not_attempted","resolved","partially_resolved","syntax_fallback","failed"] },
-    "semantic_reason": { "type": ["string","null"] },
-    "config_version": { "type": "string" },
-    "config_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "generator": { "type": "string" }
+    "schema_version": {
+      "const": "flc-sample/v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "sha256(repository_id, relative_path, source_sha256, caret_utf16_offset, target_end_utf16_offset)[:32]"
+    },
+    "repository_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full git commit SHA; null only when the input is not a git checkout."
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "'/'-separated path relative to the repository root."
+    },
+    "project": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "is_test": {
+      "type": "boolean"
+    },
+    "source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the exact original file bytes."
+    },
+    "caret_utf16_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "caret_line_zero_based": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "caret_column_utf16_zero_based": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "caret_byte_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_end_utf16_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_end_byte_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "line_start_utf16_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "line_end_utf16_offset": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "End of line content, excluding the line break."
+    },
+    "caret_kind": {
+      "enum": [
+        "line_start",
+        "identifier_partial",
+        "member_access",
+        "argument_list",
+        "after_keyword",
+        "after_operator",
+        "control_flow",
+        "lambda_body",
+        "linq",
+        "log_message",
+        "token_boundary"
+      ]
+    },
+    "caret_subkind": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "left_context_start_utf16_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "left_context_truncated": {
+      "type": "boolean"
+    },
+    "left_context": {
+      "type": "string",
+      "description": "text[left_context_start..caret]; at most context.left_chars UTF-16 units; never splits a surrogate pair."
+    },
+    "target_text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\u0085\\u2028\\u2029]*$"
+    },
+    "right_context": {
+      "type": "string",
+      "description": "text[target_end..right_context_end]; starts immediately after target_text (trailing whitespace, then the line break if present). Stored for FIM research; not a default model feature."
+    },
+    "right_context_end_utf16_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "right_context_truncated": {
+      "type": "boolean"
+    },
+    "end_of_line": {
+      "enum": [
+        "LF",
+        "CRLF",
+        "CR",
+        "OTHER",
+        "EOF"
+      ]
+    },
+    "indentation": {
+      "type": "string",
+      "description": "Leading inline whitespace of the line (Unicode Zs, tab, VT, FF; C# treats all of them as whitespace).",
+      "pattern": "^[\\t\\u000b\\u000c \\u00a0\\u1680\\u2000-\\u200a\\u202f\\u205f\\u3000]*$"
+    },
+    "quality_flags": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "trivial_target",
+          "target_starts_with_whitespace",
+          "target_starts_with_closer",
+          "trailing_whitespace",
+          "target_has_comment",
+          "file_has_syntax_errors",
+          "non_ascii_target"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "split": {
+      "enum": [
+        "train",
+        "eval",
+        "test",
+        "pilot"
+      ]
+    },
+    "split_group": {
+      "type": "string"
+    },
+    "semantic_status": {
+      "enum": [
+        "not_attempted",
+        "resolved",
+        "partially_resolved",
+        "syntax_fallback",
+        "failed"
+      ]
+    },
+    "semantic_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "config_version": {
+      "type": "string"
+    },
+    "config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generator": {
+      "type": "string"
+    }
   }
 }
