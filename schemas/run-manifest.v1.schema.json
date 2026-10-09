@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flc-dataset.local/schemas/run-manifest.v1.schema.json",
+  "title": "run-manifest/v1",
+  "type": "object",
+  "required": ["schema_version","run_id","generator","started_utc","mode","workers","repository","config","config_sha256","environment","stage_timings_ms","stage_worker_time_ms","latency","resources","throughput","outputs","counters"],
+  "properties": {
+    "schema_version": { "const": "run-manifest/v1" },
+    "run_id": { "type": "string" },
+    "mode": { "enum": ["discover","syntax_only","semantic_best_effort","semantic_required"] },
+    "workers": { "type": "integer", "minimum": 1 },
+    "repository": { "type": "object", "required": ["root","repository_id","revision","license"] },
+    "config_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "outputs": { "type": "array", "items": { "type": "object", "required": ["path","records","bytes","sha256"] } }
+  }
+}

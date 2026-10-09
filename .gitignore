@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+artifacts/
+data/repos/
+workspaces/
+.idea/
+__pycache__/
+*.pyc
+*.partial

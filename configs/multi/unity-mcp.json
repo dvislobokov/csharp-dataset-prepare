@@ -1,0 +1,117 @@
+{
+  "config_version": "multi-pilot/1",
+  "repository_id": "github.com/CoplayDev/unity-mcp",
+  "seed": 20261009,
+  "license": {
+    "allowlist": [
+      "MIT",
+      "Apache-2.0",
+      "BSD-2-Clause",
+      "BSD-3-Clause",
+      "0BSD",
+      "Unlicense",
+      "ISC"
+    ],
+    "declared": "MIT",
+    "allow_unknown": false
+  },
+  "discovery": {
+    "include": [
+      "**/*.cs"
+    ],
+    "exclude": [
+      "**/obj/**",
+      "**/bin/**",
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/Library/**",
+      "**/Temp/**"
+    ],
+    "generated_patterns": [
+      "**/*.g.cs",
+      "**/*.g.i.cs",
+      "**/*.Designer.cs",
+      "**/*.generated.cs",
+      "**/*.AssemblyInfo.cs",
+      "**/Migrations/**",
+      "**/*ModelSnapshot.cs"
+    ],
+    "vendored_patterns": [
+      "**/vendor/**",
+      "**/third_party/**",
+      "**/external/**",
+      "**/wwwroot/lib/**"
+    ],
+    "test_patterns": [
+      "tests/**",
+      "test/**",
+      "**/*.Tests/**",
+      "**/*.UnitTests/**",
+      "**/*.FunctionalTests/**"
+    ],
+    "max_file_bytes": 1048576,
+    "max_file_line_chars": 2000
+  },
+  "sampling": {
+    "weights": {
+      "line_start": 0.7,
+      "identifier_partial": 0.035,
+      "member_access": 0.8,
+      "argument_list": 0.5,
+      "after_keyword": 0.5,
+      "after_operator": 0.4,
+      "control_flow": 0.6,
+      "lambda_body": 0.5,
+      "linq": 0.6,
+      "log_message": 1.0,
+      "token_boundary": 0.02
+    },
+    "max_samples_per_line": 2,
+    "drop_duplicate_line_targets": true,
+    "max_samples_per_file": 300,
+    "max_samples_per_project": 0,
+    "identifier_prefix_max": 4,
+    "max_line_chars": 240,
+    "min_target_chars": 1,
+    "max_target_chars": 200,
+    "trivial_target_keep_probability": 0.05,
+    "exclusion_examples_per_reason": 25
+  },
+  "context": {
+    "left_chars": 6000,
+    "right_chars": 1500
+  },
+  "split": {
+    "group_by": "project_family",
+    "family_pattern": "^([^.]+)",
+    "eval_fraction": 0.15,
+    "test_fraction": 0.0,
+    "overrides": {}
+  },
+  "semantic": {
+    "solution": null,
+    "max_scope_symbols": 48,
+    "max_members": 48,
+    "max_this_members": 48,
+    "timeout_ms": 10000,
+    "subset_fraction": 1.0,
+    "policies": [
+      "editor_snapshot",
+      "strict_prefix"
+    ]
+  },
+  "secrets": {
+    "patterns": [
+      "-----BEGIN [A-Z ]*PRIVATE KEY-----",
+      "\\bAKIA[0-9A-Z]{16}\\b",
+      "\\bgh[pousr]_[A-Za-z0-9]{36,}\\b",
+      "\\bxox[baprs]-[A-Za-z0-9-]{10,}",
+      "(?i)AccountKey=[A-Za-z0-9+/=]{20,}",
+      "\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}"
+    ],
+    "line_patterns": [
+      "(?i)\\b\\w*(password|passwd|pwd|secret|apikey|api_key|accesstoken|access_token)\\w*\"?\\s*[:=]\\s*@?\"(?-i:(?![A-Z0-9_]+\"))[^\"\\s{}]{8,}\"",
+      "(?i)\\b(password|pwd)=[^;\\\"'\\s]{6,};"
+    ]
+  }
+}

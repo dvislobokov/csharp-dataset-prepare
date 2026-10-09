@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FlcDataset.Core/FlcDataset.Core.csproj" />
+    <Project Path="src/FlcDataset.Extraction/FlcDataset.Extraction.csproj" />
+    <Project Path="src/FlcDataset.Semantics/FlcDataset.Semantics.csproj" />
+    <Project Path="src/FlcDataset.Cli/FlcDataset.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlcDataset.Tests/FlcDataset.Tests.csproj" />
+  </Folder>
+</Solution>
