@@ -563,7 +563,7 @@ for attribution.
 Splits are assigned per repository group (forks/near-copies together); cross-repository duplicate files are kept once.
 No code was built or executed. See the builder repository for the data contract, leakage policy and benchmarks.
 
-## Progress (updated each batch)
+""" + SEMANTIC_MD + examples_md(args) + f"""## Progress (updated each batch)
 
 | Status | Repositories | Samples |
 |---|---|---|
@@ -572,6 +572,75 @@ No code was built or executed. See the builder repository for the data contract,
 
 
 REMOTE_FILES: set[str] = set()
+
+SEMANTIC_MD = """## How the semantic context is produced
+
+For every sample the builder removes the hidden target from the file (editor-equivalent snapshot) and asks Roslyn what is
+visible at the caret: `RET` return type, `EXPECT` expected type, `ARG` parameters, `LOCAL` locals declared before the caret,
+`FIELD`/`PROPERTY`/`METHOD` members of the current type, `RECV`/`MEMBER` receiver and its accessible members after `.`,
+`CALL` overload candidates inside an argument list, `TYPE` contracts of nearby project types. Facts never come from the hidden
+target (per-record leakage audit). The `samples` table is the canonical, model-agnostic record without facts; the facts live
+in `semantic` (join by `sample_id`), and `prompts` already contains both rendered as training pairs.
+
+```python
+from datasets import load_dataset
+repo = "dvislobokov/csharp-ml-complation"
+prompts = load_dataset(repo, "prompts", split="train")    # ready prompt/completion pairs
+samples = load_dataset(repo, "samples", split="train")    # canonical samples (no semantic columns)
+semantic = load_dataset(repo, "semantic", split="train")  # structured Roslyn facts, same sample_id
+```
+
+"""
+
+
+def pick_examples(stage: str, args) -> None:
+    """Choose README examples once from real uploaded rows (one per kind of context) and persist them."""
+    import pyarrow.parquet as pq
+    path = os.path.join(args.out, "readme_examples.json")
+    have = json.load(open(path)) if os.path.exists(path) else {}
+    wanted = {"line_start": "LOCAL ", "member_access": "MEMBER ", "argument_list": "CALL ", "after_keyword": "TYPE "}
+    if all(k in have for k in wanted):
+        return
+    pfile = sorted(glob.glob(os.path.join(stage, "data", "prompts", "train-*.parquet")))
+    sfile = sorted(glob.glob(os.path.join(stage, "data", "samples", "train-*.parquet")))
+    if not pfile or not sfile:
+        return
+    prompts = pq.read_table(pfile[0]).to_pylist()
+    cols = ["sample_id", "repository_id", "relative_path", "caret_line_zero_based"]
+    samples = {r["sample_id"]: r for r in pq.read_table(sfile[0], columns=cols).to_pylist()}
+    for kind, marker in wanted.items():
+        if kind in have:
+            continue
+        cands = sorted((r for r in prompts if r["caret_kind"] == kind and r["has_semantic"] and marker in r["prompt"]
+                        and 400 < len(r["prompt"]) < 3500 and len(r["completion"]) < 90), key=lambda r: r["sample_id"])
+        if cands:
+            r = cands[0]
+            m = samples.get(r["sample_id"], {})
+            have[kind] = {"sample_id": r["sample_id"], "repository_id": m.get("repository_id"), "relative_path": m.get("relative_path"),
+                          "line": (m.get("caret_line_zero_based") or 0) + 1, "prompt": r["prompt"], "completion": r["completion"]}
+    json.dump(have, open(path, "w"), ensure_ascii=False, indent=1)
+
+
+def examples_md(args) -> str:
+    path = os.path.join(args.out, "readme_examples.json")
+    if not os.path.exists(path):
+        return ""
+    have = json.load(open(path))
+    titles = {"line_start": "Empty line (start of a statement)", "member_access": "After `.` (receiver members)",
+              "argument_list": "Inside an argument list (overload candidates)", "after_keyword": "After a keyword (nearby project types)"}
+    out = ["## Examples (real rows from the `prompts` config)", "",
+           "`prompt` ends at the caret with `<|complete|>`; the model must produce `completion` (rest of the line + `<|eol|>`).",
+           "Code is shortened here to its last lines; stored prompts keep up to 4,000 characters of code.", ""]
+    for kind in ("line_start", "member_access", "argument_list", "after_keyword"):
+        e = have.get(kind)
+        if not e:
+            continue
+        head, _, code = e["prompt"].partition("<|code|>\n")
+        tail = "\n".join(code.split("\n")[-12:])
+        out += [f"### {titles[kind]}", "", f"`{e['repository_id']}` · `{e['relative_path']}:{e['line']}` · sample_id `{e['sample_id']}`", "",
+                "```text", head + "<|code|>", "…", tail, "```", "", f"completion: `{e['completion']}`", ""]
+    return "\n".join(out) + "\n"
+
 
 LICENSE_MD = """# Licensing
 
@@ -641,6 +710,10 @@ def write_and_upload_batch(bid: int, st: State, args, log: Log, api):
     for root, _, files in os.walk(stage):
         for f in files:
             REMOTE_FILES.add(os.path.relpath(os.path.join(root, f), stage).replace(os.sep, "/"))
+    try:
+        pick_examples(stage, args)
+    except Exception as e:  # noqa: BLE001 - README examples are cosmetic
+        log("readme_examples_error", error=str(e)[:200])
     open(os.path.join(stage, "README.md"), "w").write(readme(st, args))
     open(os.path.join(stage, "LICENSE.md"), "w").write(LICENSE_MD)
     t_upload = time.time()
