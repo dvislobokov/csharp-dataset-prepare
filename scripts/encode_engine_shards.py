@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Encode the `corpus` config with the plugin engine's tokenizer (idea-ml-completion `cs-16384.bpe`, pre-tokenizer go-code-1)
+Encode the `corpus` config with the plugin engine's tokenizer (idea-ml-completion `cs-16384.bpe` / `go-16384.bpe`, pre-tokenizer go-code-1)
 into the engine's training shard format, so that its `tools/nn/train/train.py` reads them unchanged:
 
   <fold>.tokens.u16   uint16 ids of all files, concatenated (no separators; the loader adds <|file_sep|> path / <|endoftext|>)
@@ -79,8 +79,8 @@ def encode_fold(files, out_pre, args):
     with open(out_pre + ".repos.txt.tmp", "w", encoding="utf-8", newline="\n") as f:
         f.writelines(r + "\n" for r in repos)
     meta = {"vocab": os.path.basename(args.vocab), "vocab_sha256": hashlib.sha256(open(args.vocab, "rb").read()).hexdigest(),
-            "lang": "csharp", "fold": os.path.basename(out_pre), "files": len(repo_ids), "repos": len(repos), "tokens": ntok,
-            "bytes": nbytes, "source": f"dvislobokov/csharp-ml-complation corpus/{FOLDS[os.path.basename(out_pre)]}",
+            "lang": args.lang, "fold": os.path.basename(out_pre), "files": len(repo_ids), "repos": len(repos), "tokens": ntok,
+            "bytes": nbytes, "source": f"{args.repo} corpus/{FOLDS[os.path.basename(out_pre)]}",
             "bom_stripped": True}
     with open(out_pre + ".meta.json.tmp", "w") as f:
         json.dump(meta, f, indent=1)
@@ -93,6 +93,7 @@ def encode_fold(files, out_pre, args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", default="dvislobokov/csharp-ml-complation")
+    ap.add_argument("--lang", default="csharp")
     ap.add_argument("--token-file", default="/srv/flc/secrets/HF_TOKEN")
     ap.add_argument("--engine", required=True, help="directory with the engine's cmlbpe.py")
     ap.add_argument("--vocab", required=True)
