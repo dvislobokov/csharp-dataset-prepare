@@ -60,3 +60,5 @@ and the current state. Sister project for Go: https://github.com/dvislobokov/go-
   C# 1 495, Go 82 of ~1.2 M candidates).
 - Lesson: `flc_run.py` resets `running` jobs to `pending` at start — never run two orchestrators on one state DB (a duplicate
   start failed ~520 jobs, requeued); jobs requeued in the DB while a run is active are only picked up by the next start.
+- GPU training lesson (2026-10-10): torch.distributed.run's worker processes get their own session (setsid), so killing the
+  train_lang.sh session leaves the trainer running — after a move, verify with `nvidia-smi --query-compute-apps` and kill by pid.

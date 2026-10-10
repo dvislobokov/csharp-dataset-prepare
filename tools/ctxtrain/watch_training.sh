@@ -9,6 +9,7 @@ EVERY=${EVERY:-60}
 SERVERS=(
   "Go  (H200, GPU 1; moved from the H100 at step 6000)|root@161.104.58.239||/root/flc-go|go50m-ours"
   "C#  (H200, GPU 0)|root@161.104.58.239||/root/flc-csharp|csharp50m-ours"
+  "C# hypotheses (H100): noctx lr 5e-5 / ctx lr 2e-4|ubuntu@195.209.208.156|-i $HOME/.ssh/id_immer|/home/ubuntu/flc-cs|-"
 )
 
 REMOTE=$(cat <<'PY'
@@ -26,7 +27,17 @@ def last_rows(path, n=400):
 def fmt_eta(s):
     s = int(s); return f"{s // 3600}h{s % 3600 // 60:02d}m"
 out = [f"stage: {stage}   (done: {', '.join(done) or '-'})"]
-if stage in ("pretrain", "finetune"):
+if run == "-":                                       # hypothesis runs: several fine-tunes side by side
+    out = []
+    for name in sorted(os.listdir(f"{w}/runs")) if os.path.isdir(f"{w}/runs") else []:
+        tr = [r for r in last_rows(f"{w}/runs/{name}/metrics.jsonl") if "loss" in r]
+        if tr:
+            r = tr[-1]; recent = [x["loss"] for x in tr[-10:]]
+            out.append(f"{name}: step {r['step']:,} / {r['of']:,} ({100 * r['step'] / r['of']:.0f} %)   loss {sum(recent) / len(recent):.3f}   {r['tok_s'] / 1e3:,.0f}k tok/s")
+    stage = "hyp"
+if stage == "hyp":
+    pass
+elif stage in ("pretrain", "finetune"):
     mdir = f"{w}/runs/{run}" + ("-ft" if stage == "finetune" else "")
     rows = last_rows(mdir + "/metrics.jsonl")
     tr = [r for r in rows if "loss" in r and "step" in r]
@@ -63,13 +74,14 @@ pe = f"{w}/progress_eval.jsonl"
 if os.path.exists(pe):
     rows = [json.loads(l) for l in open(pe) if l.strip()]
     ref = next((x for x in rows if x["model"] == "old"), None)
-    steps = [x for x in rows if x["model"] != "old"][-6:]
+    steps = [x for x in rows if x["model"] != "old"][-8:]
     if ref or steps:
         out.append("quality on clean positions (rest of line exact / shown / precision):")
     if ref:
         out.append(f"   old plugin model   {100 * ref['exact']:.1f} % / {100 * ref['shown']:.1f} % / {100 * ref['precision']:.1f} %")
     for x in steps:
-        label = ("fine-tune step" if x["model"].startswith("ft") else "language step") + f" {x['step']:,}"
+        m = x["model"]
+        label = ("fine-tune step" if m.startswith("ft") else "language step" if m.startswith("step") else m.rsplit("-", 1)[0]) + f" {x['step']:,}"
         out.append(f"   {label:<22}{100 * x['exact']:.1f} % / {100 * x['shown']:.1f} % / {100 * x['precision']:.1f} %")
 if stage == "eval":
     rs = [l for l in open(f"{w}/eval.log", errors="replace") if l.startswith("{\"run\"")] if os.path.exists(f"{w}/eval.log") else []
