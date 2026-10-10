@@ -1,0 +1,2 @@
+{"model": "old", "step": 0, "n": 2000, "exact": 0.3435, "shown": 0.216, "precision": 0.7847}
+{"model": "step5000", "step": 5000, "n": 2000, "exact": 0.332, "shown": 0.2025, "precision": 0.7753}
