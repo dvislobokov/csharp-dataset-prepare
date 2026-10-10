@@ -61,8 +61,10 @@ BASE=$W/runs/$RUN/ckpt-latest.pt
 
 # 2. caret fine-tuning (and the control on a second GPU)
 if step finetune; then
+  FT_LR=$(cat "$W/ft_lr" 2>/dev/null || echo "${FT_LR:-5e-5}")   # $W/ft_lr can be changed while the language model trains
+  log "finetune_lr_$FT_LR"
   "$PY" "$HERE/finetune.py" --engine "$W/engine" --init "$BASE" --docs "$CARET/train" --variant noctx --out "$W/runs/$RUN-ft" \
-      --device cuda:0 --micro 32 --accum 1 --lr 2e-4 --warmup 200 --compile > "$W/finetune.log" 2>&1 &
+      --device cuda:0 --micro 32 --accum 1 --lr "$FT_LR" --warmup 200 --compile > "$W/finetune.log" 2>&1 &
   a=$!
   if [ "${OLD_FT:-0}" = 1 ]; then                 # optional control, off by default
     dev=$([ "$NGPU" -ge 2 ] && echo cuda:1 || echo cuda:0)
