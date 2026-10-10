@@ -1,0 +1,11 @@
+{"model": "old", "step": 0, "n": 2000, "exact": 0.3145, "shown": 0.1295, "precision": 0.8185}
+{"model": "step5000", "step": 5000, "n": 2000, "exact": 0.2945, "shown": 0.1185, "precision": 0.8186}
+{"model": "step10000", "step": 10000, "n": 2000, "exact": 0.3305, "shown": 0.156, "precision": 0.8462}
+{"model": "ft4000", "step": 4000, "n": 2000, "exact": 0.41, "shown": 0.2815, "precision": 0.8988}
+{"model": "ft8000", "step": 8000, "n": 2000, "exact": 0.4195, "shown": 0.2825, "precision": 0.8938}
+{"model": "ft12000", "step": 12000, "n": 2000, "exact": 0.4145, "shown": 0.2735, "precision": 0.9031}
+{"model": "ft16000", "step": 16000, "n": 2000, "exact": 0.426, "shown": 0.2695, "precision": 0.9035}
+{"model": "ft20000", "step": 20000, "n": 2000, "exact": 0.4305, "shown": 0.284, "precision": 0.8996}
+{"model": "ft24000", "step": 24000, "n": 2000, "exact": 0.433, "shown": 0.2795, "precision": 0.9106}
+{"model": "ft28000", "step": 28000, "n": 2000, "exact": 0.4285, "shown": 0.2885, "precision": 0.9047}
+{"model": "ft32000", "step": 32000, "n": 2000, "exact": 0.4315, "shown": 0.29, "precision": 0.9086}
