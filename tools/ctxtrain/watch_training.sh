@@ -9,7 +9,7 @@ EVERY=${EVERY:-60}
 SERVERS=(
   "Go  (H200, GPU 1; moved from the H100 at step 6000)|root@161.104.58.239||/root/flc-go|go50m-ours"
   "C#  (H200, GPU 0)|root@161.104.58.239||/root/flc-csharp|csharp50m-ours"
-  "C# hypotheses (H100): noctx lr 5e-5 / ctx lr 2e-4|ubuntu@195.209.208.156|-i $HOME/.ssh/id_immer|/home/ubuntu/flc-cs|-"
+  "C# fine-tune hyper-parameters (H100)|ubuntu@195.209.208.156|-i $HOME/.ssh/id_immer|/home/ubuntu/flc-cs|-"
 )
 
 REMOTE=$(cat <<'PY'
@@ -29,11 +29,23 @@ def fmt_eta(s):
 out = [f"stage: {stage}   (done: {', '.join(done) or '-'})"]
 if run == "-":                                       # hypothesis runs: several fine-tunes side by side
     out = []
-    for name in sorted(os.listdir(f"{w}/runs")) if os.path.isdir(f"{w}/runs") else []:
-        tr = [r for r in last_rows(f"{w}/runs/{name}/metrics.jsonl") if "loss" in r]
-        if tr:
+    for sub in ("runs", "runs-short"):
+        names = sorted(os.listdir(f"{w}/{sub}")) if os.path.isdir(f"{w}/{sub}") else []
+        for name in [n for n in names if os.path.isdir(f"{w}/{sub}/{n}")]:
+            mpath = f"{w}/{sub}/{name}/metrics.jsonl"
+            tr = [r for r in last_rows(mpath) if "loss" in r]
+            if not tr:
+                continue
             r = tr[-1]; recent = [x["loss"] for x in tr[-10:]]
-            out.append(f"{name}: step {r['step']:,} / {r['of']:,} ({100 * r['step'] / r['of']:.0f} %)   loss {sum(recent) / len(recent):.3f}   {r['tok_s'] / 1e3:,.0f}k tok/s")
+            if os.path.exists(f"{w}/{sub}/{name}/done") or r["step"] >= r["of"]:
+                state = "done"
+            elif time.time() - os.path.getmtime(mpath) > 300:
+                state = "stopped"
+            else:
+                state = f"{r['tok_s'] / 1e3:,.0f}k tok/s"
+            kind = "short" if sub == "runs-short" else "full"
+            out.append(f"{kind:5s} {name:9s} step {r['step']:,} / {r['of']:,} ({100 * r['step'] / r['of']:.0f} %)   "
+                       f"loss {sum(recent) / len(recent):.3f}   {state}")
     stage = "hyp"
 if stage == "hyp":
     pass
@@ -75,7 +87,7 @@ pe = f"{w}/progress_eval.jsonl"
 if os.path.exists(pe):
     rows = [json.loads(l) for l in open(pe) if l.strip()]
     ref = next((x for x in rows if x["model"] == "old"), None)
-    steps = [x for x in rows if x["model"] != "old"][-8:]
+    steps = [x for x in rows if x["model"] != "old"][-12:]
     if ref or steps:
         out.append("quality on clean positions (rest of line exact / shown / precision):")
     if ref:
