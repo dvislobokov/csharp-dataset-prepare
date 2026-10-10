@@ -7,7 +7,10 @@
 # Servers: "name|ssh target|ssh options|work dir|run name"
 EVERY=${EVERY:-60}
 SERVERS=(
-  "Go 100M (go102m) on 2x H200: language model -> fine-tune lr 5e-5 -> eval vs ours 50M / shipped|root@161.104.58.239||/root/flc-go100|go102m-ours"
+  "Go 100M (go102m): language model -> fine-tune v2 lr 5e-5 -> eval|root@161.104.58.239||/root/flc-go100|go102m-ours"
+  "queue 1/3: C# 50M re-fine-tune on healing-v2 data|root@161.104.58.239||/root/v2/cs50|csharp50m-ours"
+  "queue 2/3: C# 100M re-fine-tune on healing-v2 data|root@161.104.58.239||/root/v2/cs100|csharp102m-ours"
+  "queue 3/3: Go 50M re-fine-tune on healing-v2 data|root@161.104.58.239||/root/v2/go50|go50m-ours"
 )
 
 REMOTE=$(cat <<'PY'
