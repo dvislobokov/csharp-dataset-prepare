@@ -49,7 +49,7 @@ def batches(docs_dir, variant, micro, seed, epochs):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine", required=True)
-    ap.add_argument("--init", required=True, help=".cml of the shipped model")
+    ap.add_argument("--init", required=True, help=".cml of a shipped model or a train.py ckpt-*.pt")
     ap.add_argument("--docs", required=True)
     ap.add_argument("--variant", choices=["ctx", "noctx"], required=True)
     ap.add_argument("--out", required=True)
@@ -65,10 +65,18 @@ def main():
     a = ap.parse_args()
     import flcctx
     flcctx.engine_paths(a.engine)
-    from cml_load import load_model
     os.makedirs(a.out, exist_ok=True)
     torch.manual_seed(a.seed)
-    model, meta = load_model(a.init)
+    if a.init.endswith(".pt"):                     # a train.py checkpoint (model trained from scratch)
+        from model import CodeLM, ModelConfig
+        ck = torch.load(a.init, map_location="cpu", weights_only=False)
+        model = CodeLM(ModelConfig.from_dict(ck["config"]))
+        model.load_state_dict(ck["model"])
+        meta = {"init": a.init, "init_step": ck.get("step"), "init_tokens": ck.get("tokens")}
+        del ck
+    else:
+        from cml_load import load_model
+        model, meta = load_model(a.init)
     model.to(a.device).train()
     fwd = torch.compile(model) if a.compile else model
     opt = torch.optim.AdamW(model.param_groups(0.1), lr=a.lr, betas=(0.9, 0.95), fused=a.device.startswith("cuda"))
