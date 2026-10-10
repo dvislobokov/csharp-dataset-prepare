@@ -7,19 +7,20 @@
 #   bash save_base.sh root@161.104.58.239 "" /root/flc-csharp csharp
 set -euo pipefail
 TARGET=$1; OPTS=$2; W=$3; LANG_=$4; DEST=${5:-/data/flc-models}
-RUN=${LANG_}50m-ours
+SIZE=${SIZE:-50m}
+RUN=${LANG_}${SIZE}-ours
 NAME=$([ "$LANG_" = go ] && echo go-16384 || echo cs-16384)
 mkdir -p "$DEST"
 # shellcheck disable=SC2086
 r() { ssh -o BatchMode=yes $OPTS "$TARGET" "$@" </dev/null; }
 until r "test -f $W/pretrain.done"; do sleep 60; done
 r "cd $W/engine/tools/nn/train && $W/venv/bin/python export.py --ckpt $W/runs/$RUN/ckpt-latest.pt \
-     --out $W/$LANG_-nn-50m-ours-base.cml --vocab $W/data/engine/$NAME/$NAME.bpe --lang $LANG_ > $W/export-base.log 2>&1 && \
+     --out $W/$LANG_-nn-$SIZE-ours-base.cml --vocab $W/data/engine/$NAME/$NAME.bpe --lang $LANG_ > $W/export-base.log 2>&1 && \
    $W/venv/bin/python -c \"import torch; ck = torch.load('$W/runs/$RUN/ckpt-latest.pt', map_location='cpu', weights_only=False); \
-     ck.pop('optimizer', None); ck.pop('stream', None); torch.save(ck, '$W/$LANG_-50m-ours-base.pt')\""
+     ck.pop('optimizer', None); ck.pop('stream', None); torch.save(ck, '$W/$LANG_-$SIZE-ours-base.pt')\""
 # shellcheck disable=SC2086
-scp -q $OPTS "$TARGET:$W/$LANG_-nn-50m-ours-base.cml" "$TARGET:$W/$LANG_-50m-ours-base.pt" \
+scp -q $OPTS "$TARGET:$W/$LANG_-nn-$SIZE-ours-base.cml" "$TARGET:$W/$LANG_-$SIZE-ours-base.pt" \
     "$TARGET:$W/runs/$RUN/metrics.jsonl" "$DEST/"
-mv "$DEST/metrics.jsonl" "$DEST/$LANG_-50m-ours-base.metrics.jsonl"
-(cd "$DEST" && sha256sum "$LANG_-nn-50m-ours-base.cml" "$LANG_-50m-ours-base.pt" | tee "$LANG_-base.sha256")
+mv "$DEST/metrics.jsonl" "$DEST/$LANG_-$SIZE-ours-base.metrics.jsonl"
+(cd "$DEST" && sha256sum "$LANG_-nn-$SIZE-ours-base.cml" "$LANG_-$SIZE-ours-base.pt" | tee "$LANG_-$SIZE-base.sha256")
 echo "saved to $DEST"

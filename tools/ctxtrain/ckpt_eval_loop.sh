@@ -12,7 +12,7 @@ N=${N:-2000}
 DEV=${DEV:-cuda:0}
 HERE=$(cd "$(dirname "$0")" && pwd)
 if [ "$LANG_" = go ]; then NAME=go-16384; OLD=go-nn-50m-e3-lr2e3.cml; else NAME=cs-16384; OLD=cs-nn-50m-e3-lr2e3.cml; fi
-RUN=${RUN:-${LANG_}50m-ours}
+RUN=${RUN:-${LANG_}${SIZE:-50m}-ours}
 PY=$W/venv/bin/python
 OUT=$W/progress_eval.jsonl
 mkdir -p "$W/peval"

@@ -19,7 +19,10 @@ if [ "$LANG_" = go ]; then
 else
   REPO=dvislobokov/csharp-ml-complation; NAME=cs-16384; OLD=cs-nn-50m-e3-lr2e3.cml
 fi
-RUN=${RUN:-${LANG_}50m-ours}
+PRESET=${PRESET:-go50m}                       # engine model preset: go50m (49.8 M), go102m (102.3 M)
+SIZE=${PRESET#go}
+RUN=${RUN:-${LANG_}${SIZE}-ours}
+REF=${REF:-}                                  # optional extra model for the final comparison: name=path
 mkdir -p "$W" && cd "$W"
 log() { echo "{\"ts\": \"$(date -u +%H:%M:%S)\", \"event\": \"$1\"}"; }
 step() { [ -f "$W/$1.done" ] && return 1; log "start_$1"; return 0; }
@@ -51,7 +54,7 @@ log "gpus_$NGPU"
 if step pretrain; then
   max=$TOKENS
   [ "$max" = 0 ] && max=$("$PY" -c "import json; print(json.load(open('$DATA/lm.meta.json'))['tokens'])")
-  export TRAIN_ARGS="--preset go50m --run $RUN --out $W/runs --data $DATA --vocab $DATA/$NAME.bpe --lr 2e-3 \
+  export TRAIN_ARGS="--preset $PRESET --run $RUN --out $W/runs --data $DATA --vocab $DATA/$NAME.bpe --lr 2e-3 \
       --tokens-per-step 524288 --micro-batch 32 --warmup 500 --fim-rate 0.7 --spm-rate 0.5 --max-tokens $max \
       --eval-every 1000 --ckpt-every 1000 --keep-every 5000 --compile"
   (cd "$T" && "$PY" -m torch.distributed.run --standalone --nproc_per_node "$NGPU" "$HERE/ddp_entry.py") > "$W/pretrain.log" 2>&1
@@ -87,6 +90,7 @@ fi
 if step eval; then
   models=(--model "new=$W/runs/$RUN-ft/ckpt-latest.pt:none" --model "new_base=$BASE:none" --model "old=$W/engine/models/$OLD:none")
   [ -f "$W/runs/old-ft/ckpt-latest.pt" ] && models+=(--model "old_ft=$W/runs/old-ft/ckpt-latest.pt:none")
+  [ -n "$REF" ] && models+=(--model "$REF:none")
   "$PY" "$HERE/eval_ctx.py" --engine "$W/engine" --vocab "$DATA/$NAME.bpe" --positions "$CARET/eval/positions.jsonl" \
       "${models[@]}" --out "$W/report.json" --device cuda:0 --batch 128 > "$W/eval.log" 2>&1
   done_ eval
@@ -94,9 +98,9 @@ fi
 
 # 4. export for the plugin
 if step export; then
-  (cd "$T" && "$PY" export.py --ckpt "$W/runs/$RUN-ft/ckpt-latest.pt" --out "$W/$LANG_-nn-50m-ours-ft.cml" --vocab "$DATA/$NAME.bpe" \
+  (cd "$T" && "$PY" export.py --ckpt "$W/runs/$RUN-ft/ckpt-latest.pt" --out "$W/$LANG_-nn-$SIZE-ours-ft.cml" --vocab "$DATA/$NAME.bpe" \
       --lang "$([ "$LANG_" = go ] && echo go || echo csharp)") > "$W/export.log" 2>&1
-  sha256sum "$W/$LANG_-nn-50m-ours-ft.cml"
+  sha256sum "$W/$LANG_-nn-$SIZE-ours-ft.cml"
   done_ export
 fi
 grep '"run"' "$W/eval.log" || true
