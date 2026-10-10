@@ -26,6 +26,8 @@ import random
 import sys
 import time
 
+import numpy as np
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import flcctx as F  # noqa: E402
 
@@ -126,7 +128,7 @@ def _work(job):
         stats["split_mismatch"] += not p_ctx.split_ok
         stats["with_facts"] += p_ctx.facts_tokens > 0
         stats["with_deps"] += p_ctx.deps_tokens > 0
-        out.append((p_ctx.ids, p_no.ids, mid))
+        out.append((np.asarray(p_ctx.ids, np.uint16), np.asarray(p_no.ids, np.uint16), np.asarray(mid, np.uint16)))  # compact: 1M docs
     stats["docs"] += len(out)
     return out, stats
 
@@ -230,7 +232,7 @@ def load_inputs(a):
 
 def write_shard(prefix, docs):
     import numpy as np
-    toks = np.concatenate([np.asarray(d[0] + d[1], dtype=np.uint16) for d in docs]) if docs else np.zeros(0, np.uint16)
+    toks = np.concatenate([x for d in docs for x in (d[0], d[1])]).astype(np.uint16) if docs else np.zeros(0, np.uint16)
     offs = np.zeros(len(docs) + 1, dtype=np.uint64)
     np.cumsum([len(d[0]) + len(d[1]) for d in docs], out=offs[1:])
     loss = np.asarray([len(d[0]) for d in docs], dtype=np.uint32)
