@@ -42,7 +42,8 @@ if stage in ("pretrain", "finetune"):
         total = r.get("of") or total
         tok_s = r.get("tok_s") or (sum(x.get("tok_s", 0) for x in tr[-5:]) / max(len(tr[-5:]), 1))
         line = f"step {r['step']:,}" + (f" / {total:,} ({100 * r['step'] / total:.1f} %)" if total else "")
-        line += f"   loss {r['loss']:.3f}   {tok_s / 1e3:,.0f}k tok/s"
+        recent = [x["loss"] for x in tr[-10:]]                 # one row = 10-20 steps: average the last ~10 rows
+        line += f"   loss {sum(recent) / len(recent):.3f} (avg last {len(recent)} rows)   {tok_s / 1e3:,.0f}k tok/s"
         if "grad_norm" in r:
             line += f"   gnorm {r['grad_norm']:.2f}"
         if "lr" in r:
