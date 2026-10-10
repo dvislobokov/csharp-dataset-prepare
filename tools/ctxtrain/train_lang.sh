@@ -63,8 +63,15 @@ BASE=$W/runs/$RUN/ckpt-latest.pt
 if step finetune; then
   FT_LR=$(cat "$W/ft_lr" 2>/dev/null || echo "${FT_LR:-5e-5}")   # $W/ft_lr can be changed while the language model trains
   log "finetune_lr_$FT_LR"
-  "$PY" "$HERE/finetune.py" --engine "$W/engine" --init "$BASE" --docs "$CARET/train" --variant noctx --out "$W/runs/$RUN-ft" \
-      --device cuda:0 --micro 32 --accum 1 --lr "$FT_LR" --warmup 200 --compile > "$W/finetune.log" 2>&1 &
+  FT_ARGS="--engine $W/engine --init $BASE --docs $CARET/train --variant noctx --out $W/runs/$RUN-ft --device cuda:0 \
+      --micro 32 --accum 1 --lr $FT_LR --warmup 200 --compile"
+  if [ "$NGPU" -ge 2 ]; then                     # same global batch on all GPUs (finetune.py under torchrun)
+    TRAIN_ARGS="$FT_ARGS" ENTRY_SCRIPT="$HERE/finetune.py" "$PY" -m torch.distributed.run --standalone \
+        --nproc_per_node "$NGPU" "$HERE/ddp_entry.py" > "$W/finetune.log" 2>&1 &
+  else
+    # shellcheck disable=SC2086
+    "$PY" "$HERE/finetune.py" $FT_ARGS > "$W/finetune.log" 2>&1 &
+  fi
   a=$!
   if [ "${OLD_FT:-0}" = 1 ]; then                 # optional control, off by default
     dev=$([ "$NGPU" -ge 2 ] && echo cuda:1 || echo cuda:0)

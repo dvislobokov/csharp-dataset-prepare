@@ -25,7 +25,8 @@ import torch.nn.functional as Fn
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-def batches(docs_dir, variant, micro, seed, epochs):
+def batches(docs_dir, variant, micro, seed, epochs, rank=0, world=1):
+    """micro = documents per step over all ranks; rank r takes every world-th document of each step's slice."""
     pre = os.path.join(docs_dir, variant)
     toks = np.memmap(pre + ".tokens.u16", dtype=np.uint16, mode="r")
     offs = np.fromfile(pre + ".offsets.u64", dtype=np.uint64).astype(np.int64)
@@ -34,10 +35,10 @@ def batches(docs_dir, variant, micro, seed, epochs):
     for ep in range(epochs):
         order = np.random.default_rng([seed, ep]).permutation(n)       # same permutation for both variants
         for k in range(0, n - micro + 1, micro):
-            idx = order[k:k + micro]
+            idx = order[k:k + micro][rank::world]
             L = int(max(offs[i + 1] - offs[i] for i in idx))
-            x = np.zeros((micro, L), dtype=np.int64)
-            y = np.full((micro, L), -100, dtype=np.int64)
+            x = np.zeros((len(idx), L), dtype=np.int64)
+            y = np.full((len(idx), L), -100, dtype=np.int64)
             for j, i in enumerate(idx):
                 d = toks[offs[i]:offs[i + 1]].astype(np.int64)
                 x[j, :len(d)] = d
@@ -64,6 +65,13 @@ def main():
     ap.add_argument("--compile", action="store_true")
     ap.add_argument("--save-every", type=int, default=4000, help="also keep ckpt-<step>.pt every N steps (0 = off)")
     a = ap.parse_args()
+    world, rank, local = (int(os.environ.get(k, d)) for k, d in (("WORLD_SIZE", "1"), ("RANK", "0"), ("LOCAL_RANK", "0")))
+    if world > 1:                                  # torchrun: one process per GPU, same global batch and step count
+        import torch.distributed as dist
+        torch.cuda.set_device(local)
+        dist.init_process_group("nccl", device_id=torch.device("cuda", local))
+        a.device = f"cuda:{local}"
+    main_proc = rank == 0
     import flcctx
     flcctx.engine_paths(a.engine)
     os.makedirs(a.out, exist_ok=True)
@@ -80,12 +88,14 @@ def main():
         model, meta = load_model(a.init)
     model.to(a.device).train()
     fwd = torch.compile(model) if a.compile else model
+    if world > 1:
+        fwd = torch.nn.parallel.DistributedDataParallel(fwd, device_ids=[local], broadcast_buffers=False)
     opt = torch.optim.AdamW(model.param_groups(0.1), lr=a.lr, betas=(0.9, 0.95), fused=a.device.startswith("cuda"))
     n_docs = len(np.fromfile(os.path.join(a.docs, a.variant + ".loss_start.u32"), dtype=np.uint32))
     total = a.max_steps or (n_docs // a.micro * a.epochs) // a.accum
-    log = open(os.path.join(a.out, "metrics.jsonl"), "a")
+    log = open(os.path.join(a.out, "metrics.jsonl"), "a") if main_proc else None
     step, tokens, t0, acc_loss, acc_n = 0, 0, time.time(), 0.0, 0
-    it = batches(a.docs, a.variant, a.micro, a.seed, a.epochs)
+    it = batches(a.docs, a.variant, a.micro, a.seed, a.epochs, rank, world)
     while step < total:
         lr = a.lr * min(1.0, (step + 1) / a.warmup) * (0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * min(1.0, step / max(1, total)))))
         for g in opt.param_groups:
@@ -102,23 +112,32 @@ def main():
             loss = Fn.cross_entropy(logits.float().view(-1, logits.size(-1)), y.view(-1), ignore_index=-100)
             (loss / a.accum).backward()
             acc_loss += float(loss); acc_n += 1
-            tokens += int(x.numel())
+            tokens += int(x.numel()) * world
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
         opt.zero_grad(set_to_none=True)
         step += 1
-        if a.save_every and step % a.save_every == 0 and step < total:     # intermediate models for ckpt_eval_loop.sh
+        if main_proc and a.save_every and step % a.save_every == 0 and step < total:     # intermediate models for ckpt_eval_loop.sh
             torch.save({"model": model.state_dict(), "config": model.config.to_dict(), "step": step, "tokens": tokens,
                         "args": {**vars(a), "no_path": False}, "init_meta": meta}, os.path.join(a.out, f"ckpt-{step}.pt"))
         if step % 20 == 0 or step == total:
+            if world > 1:                          # loss averaged over ranks for the log
+                t = torch.tensor([acc_loss, acc_n], device=a.device, dtype=torch.float64)
+                dist.all_reduce(t)
+                acc_loss, acc_n = float(t[0]), int(t[1])
             row = {"step": step, "of": total, "loss": round(acc_loss / max(acc_n, 1), 4), "lr": lr, "tokens": tokens,
                    "tok_s": round(tokens / (time.time() - t0)), "elapsed_s": round(time.time() - t0)}
-            print(json.dumps(row), flush=True)
-            log.write(json.dumps(row) + "\n"); log.flush()
+            if main_proc:
+                print(json.dumps(row), flush=True)
+                log.write(json.dumps(row) + "\n"); log.flush()
             acc_loss, acc_n = 0.0, 0
-    torch.save({"model": model.state_dict(), "config": model.config.to_dict(), "step": step, "tokens": tokens,
-                "args": {**vars(a), "no_path": False}, "init_meta": meta}, os.path.join(a.out, "ckpt-latest.pt"))
-    print(json.dumps({"event": "saved", "path": os.path.join(a.out, "ckpt-latest.pt"), "steps": step}), flush=True)
+    if main_proc:
+        torch.save({"model": model.state_dict(), "config": model.config.to_dict(), "step": step, "tokens": tokens,
+                    "args": {**vars(a), "no_path": False}, "init_meta": meta}, os.path.join(a.out, "ckpt-latest.pt"))
+        print(json.dumps({"event": "saved", "path": os.path.join(a.out, "ckpt-latest.pt"), "steps": step}), flush=True)
+    if world > 1:
+        dist.barrier()
+        dist.destroy_process_group()
 
 
 if __name__ == "__main__":

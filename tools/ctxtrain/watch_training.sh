@@ -7,9 +7,9 @@
 # Servers: "name|ssh target|ssh options|work dir|run name"
 EVERY=${EVERY:-60}
 SERVERS=(
-  "Go  (H200, GPU 1; moved from the H100 at step 6000)|root@161.104.58.239||/root/flc-go|go50m-ours"
-  "C#  (H200, GPU 0)|root@161.104.58.239||/root/flc-csharp|csharp50m-ours"
-  "C# fine-tune hyper-parameters (H100)|ubuntu@195.209.208.156|-i $HOME/.ssh/id_immer|/home/ubuntu/flc-cs|-"
+  "Go  (2x H200): language model done, caret fine-tune lr 5e-5 on both GPUs|root@161.104.58.239||/root/flc-go|go50m-ours"
+  "C#  (H200): first model (fine-tune lr 2e-4), finished|root@161.104.58.239||/root/flc-csharp|csharp50m-ours"
+  "C#  (H100): final fine-tune lr 5e-5 (full) + short lr tests|ubuntu@195.209.208.156|-i $HOME/.ssh/id_immer|/home/ubuntu/flc-cs|-"
 )
 
 REMOTE=$(cat <<'PY'

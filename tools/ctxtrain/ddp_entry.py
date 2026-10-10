@@ -5,6 +5,7 @@ import runpy
 import shlex
 import sys
 
-sys.argv = ["train.py"] + shlex.split(os.environ["TRAIN_ARGS"])
-sys.path.insert(0, os.getcwd())
-runpy.run_path("train.py", run_name="__main__")
+script = os.environ.get("ENTRY_SCRIPT", "train.py")      # train.py (cwd = engine tools/nn/train) or finetune.py
+sys.argv = [script] + shlex.split(os.environ["TRAIN_ARGS"])
+sys.path.insert(0, os.path.dirname(os.path.abspath(script)))
+runpy.run_path(script, run_name="__main__")

@@ -8,8 +8,9 @@ set -uo pipefail
 W=${W:?}; BASE=${BASE:?}; DEV=${DEV:-cuda:0}
 HERE=$(cd "$(dirname "$0")" && pwd)
 PY=$W/venv/bin/python
-D=$W/data/caret/cs-16384
-VOCAB=$W/engine/models/cs-16384.bpe
+NAME=${NAME:-cs-16384}                      # go-16384 for Go
+D=$W/data/caret/$NAME
+VOCAB=$W/engine/models/$NAME.bpe
 mkdir -p "$W/runs-short" "$W/peval"
 evaluate() {  # evaluate <tag> <ckpt> <step>
   "$PY" "$HERE/eval_ctx.py" --engine "$W/engine" --vocab "$VOCAB" --positions "$D/eval/positions.jsonl" --limit 2000 \
