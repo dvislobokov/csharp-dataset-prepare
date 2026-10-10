@@ -7,8 +7,8 @@
 # Servers: "name|ssh target|ssh options|work dir|run name"
 EVERY=${EVERY:-60}
 SERVERS=(
-  "Go  (1x H100)|ubuntu@195.209.208.156|-i $HOME/.ssh/id_immer|/home/ubuntu/flc-go|go50m-ours"
-  "C#  (2x H200)|root@161.104.58.239||/root/flc-csharp|csharp50m-ours"
+  "Go  (H200, GPU 1; moved from the H100 at step 6000)|root@161.104.58.239||/root/flc-go|go50m-ours"
+  "C#  (H200, GPU 0)|root@161.104.58.239||/root/flc-csharp|csharp50m-ours"
 )
 
 REMOTE=$(cat <<'PY'
@@ -43,6 +43,10 @@ if stage in ("pretrain", "finetune"):
         tok_s = r.get("tok_s") or (sum(x.get("tok_s", 0) for x in tr[-5:]) / max(len(tr[-5:]), 1))
         line = f"step {r['step']:,}" + (f" / {total:,} ({100 * r['step'] / total:.1f} %)" if total else "")
         line += f"   loss {r['loss']:.3f}   {tok_s / 1e3:,.0f}k tok/s"
+        if "grad_norm" in r:
+            line += f"   gnorm {r['grad_norm']:.2f}"
+        if "lr" in r:
+            line += f"   lr {r['lr']:.1e}"
         if total and tok_s:
             tokens_left = (total - r["step"]) * (r["tokens"] / max(r["step"], 1))
             line += f"   ETA {fmt_eta(tokens_left / tok_s)}"
@@ -54,7 +58,18 @@ if stage in ("pretrain", "finetune"):
     if ev:
         e = ev[-1]
         out.append(f"eval @ step {e.get('step', '?')}: ppl {e['eval_ppl']:.3f}" + (f"   FIM ppl {e['eval_fim_ppl']:.3f}" if "eval_fim_ppl" in e else ""))
-elif stage == "eval":
+pe = f"{w}/progress_eval.jsonl"
+if os.path.exists(pe):
+    rows = [json.loads(l) for l in open(pe) if l.strip()]
+    ref = next((x for x in rows if x["model"] == "old"), None)
+    steps = [x for x in rows if x["model"] != "old"][-4:]
+    if ref or steps:
+        out.append("quality on clean positions (rest of line exact / shown / precision):")
+    if ref:
+        out.append(f"   old plugin model   {100 * ref['exact']:.1f} % / {100 * ref['shown']:.1f} % / {100 * ref['precision']:.1f} %")
+    for x in steps:
+        out.append(f"   step {x['step']:>6,}        {100 * x['exact']:.1f} % / {100 * x['shown']:.1f} % / {100 * x['precision']:.1f} %")
+if stage == "eval":
     rs = [l for l in open(f"{w}/eval.log", errors="replace") if l.startswith("{\"run\"")] if os.path.exists(f"{w}/eval.log") else []
     out += [l.strip() for l in rs] or ["evaluating..."]
 elif stage == "finished":

@@ -41,7 +41,7 @@ PY
   done_ setup
 fi
 PY=$W/venv/bin/python
-NGPU=$(nvidia-smi -L | wc -l)
+NGPU=${NGPU:-$(nvidia-smi -L | wc -l)}   # with CUDA_VISIBLE_DEVICES set NGPU explicitly
 DATA=$W/data/engine/$NAME
 CARET=$W/data/caret/$NAME
 T=$W/engine/tools/nn/train
