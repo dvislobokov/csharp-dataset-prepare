@@ -51,7 +51,8 @@ elif stage in ("pretrain", "finetune"):
     if tr:
         r = tr[-1]
         total = r.get("of") or total
-        tok_s = r.get("tok_s") or (sum(x.get("tok_s", 0) for x in tr[-5:]) / max(len(tr[-5:]), 1))
+        speeds = sorted(x["tok_s"] for x in tr[-11:] if x.get("tok_s"))      # median: rows that include an eval are slow
+        tok_s = speeds[len(speeds) // 2] if speeds else 0
         line = f"step {r['step']:,}" + (f" / {total:,} ({100 * r['step'] / total:.1f} %)" if total else "")
         recent = [x["loss"] for x in tr[-10:]]                 # one row = 10-20 steps: average the last ~10 rows
         line += f"   loss {sum(recent) / len(recent):.3f} (avg last {len(recent)} rows)   {tok_s / 1e3:,.0f}k tok/s"
