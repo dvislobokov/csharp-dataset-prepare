@@ -41,7 +41,7 @@ PY
 
 # 1. engine shards (downloads the whole corpus to $SH/src)
 if step encode; then
-  "$PY" -I "$APP/scripts/encode_engine_shards.py" --repo "$HF" --lang "$LANG_" --engine "$ENGINE" --vocab "$VOCAB" \
+  "$PY" -I "$APP/scripts/encode_engine_shards.py" --repo "$HF" --lang "$LANG_" --engine "$ENGINE/tools/nn/tokenizer" --vocab "$VOCAB" \
       --work "$SH" --workers "$WORKERS" --upload
   done_ encode
 fi

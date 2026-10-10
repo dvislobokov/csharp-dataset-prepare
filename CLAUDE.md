@@ -47,3 +47,16 @@ and the current state. Sister project for Go: https://github.com/dvislobokov/go-
   `<|reserved_N|>` specials, `DEPS` at the start; golden examples); (3) generator of training documents in the engine format with
   and without context, encoded with `cs-16384.bpe`; (4) `eval_inline` with/without context on the same positions; (5) proxy model
   (31 M) on a rented H200 before any plugin work — the engine's earlier Roslyn context study gained only ~2 %.
+
+## Expansion 2026-10-10 (all stars; data for training from scratch)
+- C#: star buckets 0..34 added (`scripts/expand_lowstars.sh`, tags `s00_04`..`s30_34`, eval-fresh repositories excluded);
+  29 117 repositories in the corpus. Go (second server 161.104.54.103, `/srv/flc-go`): 5..99 stars added (tag `g2`), 43 356.
+- `scripts/finalize_expand.sh` (per language, resumable per step) rebuilt and uploaded: `engine/<vocab>/` (C# lm 6.47 G tokens /
+  27 948 repos, Go lm 10.42 G / 41 688), `decontam/`, `eval-fresh/decontam/`, `deps/`, and the new `caret/<vocab>/`:
+  `train` = 1 050 000 caret documents per language (C# 1.01 G noctx tokens from 20 369 repos, Go 1.15 G from 20 190; ctx and
+  noctx variants, `make_docs.py` format), `eval` = 12 000 clean eval-fresh positions minus near duplicates; `CHECKS.json`
+  (`tools/ctxtrain/check_caret.py`) all ok, eval-fresh repositories absent from every training split.
+- make_docs drops documents whose healing boundary lies before the line start (completion would start with a newline:
+  C# 1 495, Go 82 of ~1.2 M candidates).
+- Lesson: `flc_run.py` resets `running` jobs to `pending` at start — never run two orchestrators on one state DB (a duplicate
+  start failed ~520 jobs, requeued); jobs requeued in the DB while a run is active are only picked up by the next start.

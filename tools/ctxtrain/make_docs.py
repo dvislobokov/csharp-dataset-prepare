@@ -121,6 +121,9 @@ def _work(job):
         fl = corrupt(lines, sem, rnd) if with_facts and u(seed, "corrupt") < 0.4 else lines
         p_ctx = F.build(_tok, text, caret, s["relative_path"], d_ids if with_deps else [], F.facts_block(_tok, fl) if with_facts and fl else [])
         p_no = F.build(_tok, text, caret, s["relative_path"], [], [])
+        if b"\n" in text[p_no.boundary:caret] or b"\r" in text[p_no.boundary:caret]:
+            stats["newline_in_completion"] += 1    # healing boundary before the line start (mixed indentation): never train a
+            continue                               # completion that starts on the previous line
         mid = _tok.encode(text[p_no.boundary:caret] + target) + [_tok.eot]
         if len(mid) > 256 or len(p_ctx.ids) + len(mid) > 2048:
             stats["too_long"] += 1
