@@ -3,7 +3,7 @@
 #   1. language: the engine's train.py on engine/<vocab> (whole files, FIM), go50m preset, the engine's lr2e3 recipe,
 #      DDP over all GPUs
 #   2. task: finetune.py on caret/<vocab>/train (noctx variant, loss only on the completion)
-#      + control (2+ GPUs or OLD_FT=1): the shipped plugin model fine-tuned on the same documents
+#      + optional control (OLD_FT=1): the shipped plugin model fine-tuned on the same documents
 #   3. eval_ctx.py on caret/<vocab>/eval (clean eval-fresh positions): new, new before step 2, shipped, shipped + step 2
 #   4. export of the new model to .cml (engine export.py)
 # Every step writes <step>.done in $W, so a rerun continues (train.py itself resumes from ckpt-latest.pt).
@@ -27,6 +27,8 @@ done_() { touch "$W/$1.done"; log "done_$1"; }
 
 if step setup; then
   command -v python3 >/dev/null
+  # torch.compile (triton) builds a small C extension: needs the Python headers and a compiler
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "python3-dev" "python$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')-dev" build-essential >/dev/null 2>&1 || true
   python3 -m venv venv 2>/dev/null || { sudo apt-get install -y -qq python3-venv >/dev/null; python3 -m venv venv; }
   venv/bin/pip install -q torch numpy pyarrow huggingface_hub
   [ -d engine ] || git clone -q --depth 1 https://github.com/dvislobokov/idea-ml-completion.git engine
@@ -49,10 +51,10 @@ log "gpus_$NGPU"
 if step pretrain; then
   max=$TOKENS
   [ "$max" = 0 ] && max=$("$PY" -c "import json; print(json.load(open('$DATA/lm.meta.json'))['tokens'])")
-  (cd "$T" && "$PY" -m torch.distributed.run --standalone --nproc_per_node "$NGPU" train.py --preset go50m --run "$RUN" \
-      --out "$W/runs" --data "$DATA" --vocab "$DATA/$NAME.bpe" --lr 2e-3 --tokens-per-step 524288 --micro-batch 32 \
-      --warmup 500 --fim-rate 0.7 --spm-rate 0.5 --max-tokens "$max" --eval-every 1000 --ckpt-every 1000 --keep-every 5000 \
-      --compile) > "$W/pretrain.log" 2>&1
+  export TRAIN_ARGS="--preset go50m --run $RUN --out $W/runs --data $DATA --vocab $DATA/$NAME.bpe --lr 2e-3 \
+      --tokens-per-step 524288 --micro-batch 32 --warmup 500 --fim-rate 0.7 --spm-rate 0.5 --max-tokens $max \
+      --eval-every 1000 --ckpt-every 1000 --keep-every 5000 --compile"
+  (cd "$T" && "$PY" -m torch.distributed.run --standalone --nproc_per_node "$NGPU" "$HERE/ddp_entry.py") > "$W/pretrain.log" 2>&1
   done_ pretrain
 fi
 BASE=$W/runs/$RUN/ckpt-latest.pt
@@ -62,7 +64,7 @@ if step finetune; then
   "$PY" "$HERE/finetune.py" --engine "$W/engine" --init "$BASE" --docs "$CARET/train" --variant noctx --out "$W/runs/$RUN-ft" \
       --device cuda:0 --micro 32 --accum 1 --lr 2e-4 --warmup 200 --compile > "$W/finetune.log" 2>&1 &
   a=$!
-  if [ "$NGPU" -ge 2 ] || [ "${OLD_FT:-0}" = 1 ]; then
+  if [ "${OLD_FT:-0}" = 1 ]; then                 # optional control, off by default
     dev=$([ "$NGPU" -ge 2 ] && echo cuda:1 || echo cuda:0)
     [ "$NGPU" -ge 2 ] || wait $a
     "$PY" "$HERE/finetune.py" --engine "$W/engine" --init "$W/engine/models/$OLD" --docs "$CARET/train" --variant noctx \
