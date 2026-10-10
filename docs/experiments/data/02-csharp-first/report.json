@@ -1,0 +1,275 @@
+{
+ "positions": 12000,
+ "runs": {
+  "new:none": {
+   "n": 12000,
+   "exact": 0.4049,
+   "shown": 0.2499,
+   "precision": 0.899
+  },
+  "new_base:none": {
+   "n": 12000,
+   "exact": 0.3347,
+   "shown": 0.1582,
+   "precision": 0.8077
+  },
+  "old:none": {
+   "n": 12000,
+   "exact": 0.3274,
+   "shown": 0.1536,
+   "precision": 0.8128
+  }
+ },
+ "by_kind": {
+  "new:none": {
+   "after_keyword": {
+    "n": 447,
+    "exact": 0.4385,
+    "shown": 0.2103,
+    "precision": 0.9255
+   },
+   "after_operator": {
+    "n": 836,
+    "exact": 0.4629,
+    "shown": 0.2656,
+    "precision": 0.9234
+   },
+   "argument_list": {
+    "n": 1260,
+    "exact": 0.4587,
+    "shown": 0.2619,
+    "precision": 0.9091
+   },
+   "control_flow": {
+    "n": 301,
+    "exact": 0.2757,
+    "shown": 0.1329,
+    "precision": 0.825
+   },
+   "identifier_partial": {
+    "n": 2071,
+    "exact": 0.5268,
+    "shown": 0.3737,
+    "precision": 0.9367
+   },
+   "lambda_body": {
+    "n": 67,
+    "exact": 0.403,
+    "shown": 0.1642,
+    "precision": 0.8182
+   },
+   "line_start": {
+    "n": 3929,
+    "exact": 0.2838,
+    "shown": 0.1143,
+    "precision": 0.9087
+   },
+   "linq": {
+    "n": 197,
+    "exact": 0.3706,
+    "shown": 0.1726,
+    "precision": 0.9412
+   },
+   "log_message": {
+    "n": 32,
+    "exact": 0.0312,
+    "shown": 0.0,
+    "precision": 0.0
+   },
+   "member_access": {
+    "n": 2334,
+    "exact": 0.4567,
+    "shown": 0.389,
+    "precision": 0.859
+   },
+   "token_boundary": {
+    "n": 526,
+    "exact": 0.4601,
+    "shown": 0.2605,
+    "precision": 0.854
+   }
+  },
+  "new_base:none": {
+   "after_keyword": {
+    "n": 447,
+    "exact": 0.038,
+    "shown": 0.0403,
+    "precision": 0.2222
+   },
+   "after_operator": {
+    "n": 836,
+    "exact": 0.0084,
+    "shown": 0.0574,
+    "precision": 0.0208
+   },
+   "argument_list": {
+    "n": 1260,
+    "exact": 0.2905,
+    "shown": 0.1484,
+    "precision": 0.6257
+   },
+   "control_flow": {
+    "n": 301,
+    "exact": 0.2525,
+    "shown": 0.113,
+    "precision": 0.7353
+   },
+   "identifier_partial": {
+    "n": 2071,
+    "exact": 0.5287,
+    "shown": 0.2129,
+    "precision": 0.941
+   },
+   "lambda_body": {
+    "n": 67,
+    "exact": 0.0149,
+    "shown": 0.0746,
+    "precision": 0.0
+   },
+   "line_start": {
+    "n": 3929,
+    "exact": 0.2721,
+    "shown": 0.0718,
+    "precision": 0.7305
+   },
+   "linq": {
+    "n": 197,
+    "exact": 0.3147,
+    "shown": 0.1371,
+    "precision": 0.7037
+   },
+   "log_message": {
+    "n": 32,
+    "exact": 0.0,
+    "shown": 0.3125,
+    "precision": 0.0
+   },
+   "member_access": {
+    "n": 2334,
+    "exact": 0.464,
+    "shown": 0.3248,
+    "precision": 0.8813
+   },
+   "token_boundary": {
+    "n": 526,
+    "exact": 0.4563,
+    "shown": 0.1673,
+    "precision": 0.8864
+   }
+  },
+  "old:none": {
+   "after_keyword": {
+    "n": 447,
+    "exact": 0.0358,
+    "shown": 0.0268,
+    "precision": 0.4167
+   },
+   "after_operator": {
+    "n": 836,
+    "exact": 0.0072,
+    "shown": 0.067,
+    "precision": 0.0
+   },
+   "argument_list": {
+    "n": 1260,
+    "exact": 0.2849,
+    "shown": 0.1476,
+    "precision": 0.6237
+   },
+   "control_flow": {
+    "n": 301,
+    "exact": 0.2492,
+    "shown": 0.0831,
+    "precision": 0.76
+   },
+   "identifier_partial": {
+    "n": 2071,
+    "exact": 0.5263,
+    "shown": 0.2062,
+    "precision": 0.9578
+   },
+   "lambda_body": {
+    "n": 67,
+    "exact": 0.0149,
+    "shown": 0.1493,
+    "precision": 0.0
+   },
+   "line_start": {
+    "n": 3929,
+    "exact": 0.2566,
+    "shown": 0.0728,
+    "precision": 0.7517
+   },
+   "linq": {
+    "n": 197,
+    "exact": 0.2893,
+    "shown": 0.1472,
+    "precision": 0.7586
+   },
+   "log_message": {
+    "n": 32,
+    "exact": 0.0,
+    "shown": 0.0938,
+    "precision": 0.0
+   },
+   "member_access": {
+    "n": 2334,
+    "exact": 0.4602,
+    "shown": 0.3119,
+    "precision": 0.8736
+   },
+   "token_boundary": {
+    "n": 526,
+    "exact": 0.462,
+    "shown": 0.154,
+    "precision": 0.9383
+   }
+  }
+ },
+ "paired": {
+  "new:none - new_base:none": {
+   "diff": 0.0703,
+   "ci95": [
+    0.0621,
+    0.0784
+   ]
+  },
+  "new:none - old:none": {
+   "diff": 0.0775,
+   "ci95": [
+    0.0691,
+    0.0854
+   ]
+  },
+  "new_base:none - old:none": {
+   "diff": 0.0073,
+   "ci95": [
+    0.0013,
+    0.0128
+   ]
+  }
+ },
+ "paired_on_positions_with_facts": {
+  "new:none - new_base:none": {
+   "diff": 0.0774,
+   "ci95": [
+    0.0691,
+    0.0857
+   ]
+  },
+  "new:none - old:none": {
+   "diff": 0.0849,
+   "ci95": [
+    0.0772,
+    0.093
+   ]
+  },
+  "new_base:none - old:none": {
+   "diff": 0.0076,
+   "ci95": [
+    0.0018,
+    0.0131
+   ]
+  }
+ }
+}

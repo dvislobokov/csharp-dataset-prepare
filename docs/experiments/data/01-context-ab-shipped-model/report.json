@@ -1,0 +1,47 @@
+{
+ "experiment": "01-context-ab-shipped-model",
+ "date": "2026-10-09/10",
+ "source": "eval_ctx.py report.json on the 2x RTX PRO 6000 server (135.106.230.24, since switched off); numbers copied from the run log",
+ "question": "Does the flc-context/v1.1 block (project profile + per-caret facts RET/EXPECT/ARG/LOCAL/FIELD/PROPERTY/RECV/MEMBER/CALL) improve whole-line completion?",
+ "setup": {
+  "init": "shipped plugin model cs-nn-50m-e3-lr2e3.cml (idea-ml-completion)",
+  "train_docs": "ctxdocs/v1.1-cs50m/train: 311 016 caret documents (ctx 319.8 M tokens, noctx 301.1 M tokens), same documents and order for both variants",
+  "A": "fine-tuned WITH context (facts p 0.75, corruption p 0.4, profile p 0.8)",
+  "B": "fine-tuned WITHOUT context (control)",
+  "recipe": "micro 32, accum 1, lr 2e-4, warmup 200, cosine, 9 375 steps, bf16, torch.compile; one GPU per variant",
+  "throughput": "370-395 k tokens/s per RTX PRO 6000 Blackwell",
+  "eval": "12 000 clean eval-fresh positions (5..19-star repositories, near duplicates removed), engine greedy decoder with healing; gate confProd >= 0.7 (0.5 after a dot)"
+ },
+ "runs": {
+  "A:none": {"exact": 0.3913, "shown": 0.2497, "precision": 0.8835},
+  "A:deps": {"exact": 0.3906, "shown": 0.2492, "precision": 0.886},
+  "A:full": {"exact": 0.3859, "shown": 0.2403, "precision": 0.8835},
+  "B:none": {"exact": 0.3954, "shown": 0.2498, "precision": 0.8779},
+  "old:none": {"exact": 0.3294, "shown": 0.1543, "precision": 0.8089},
+  "old:full": {"exact": 0.1674, "shown": 0.0461, "precision": 0.8156}
+ },
+ "paired_bootstrap_exact": {
+  "A:full - B:none": {"diff": -0.0095, "ci95": [-0.0149, -0.0043], "on_positions_with_facts": {"diff": -0.0107, "ci95": [-0.0164, -0.0048]}},
+  "A:deps - B:none": {"diff": -0.0048, "ci95": [-0.0098, 0.0], "on_positions_with_facts": {"diff": -0.0055, "ci95": [-0.0103, -0.0003]}},
+  "A:none - B:none": {"diff": -0.0041, "ci95": [-0.0091, 0.0008]},
+  "A:none - A:full": {"diff": 0.0054, "ci95": [0.0012, 0.0097]},
+  "B:none - old:none": {"diff": 0.066, "ci95": [0.0584, 0.0737]}
+ },
+ "by_kind_exact": {
+  "columns": ["n", "old:none", "B:none", "A:none", "A:full"],
+  "after_keyword": [442, 0.036, 0.434, 0.419, 0.407],
+  "after_operator": [830, 0.007, 0.430, 0.437, 0.429],
+  "argument_list": [1260, 0.288, 0.451, 0.444, 0.450],
+  "control_flow": [294, 0.238, 0.269, 0.279, 0.265],
+  "identifier_partial": [2073, 0.528, 0.530, 0.521, 0.520],
+  "lambda_body": [66, 0.015, 0.348, 0.348, 0.318],
+  "line_start": [3925, 0.259, 0.272, 0.273, 0.263],
+  "linq": [194, 0.289, 0.387, 0.361, 0.356],
+  "log_message": [33, 0.000, 0.030, 0.000, 0.000],
+  "member_access": [2352, 0.461, 0.448, 0.437, 0.436],
+  "token_boundary": [531, 0.461, 0.435, 0.437, 0.424]
+ },
+ "positions_with_facts": 10727,
+ "positions_with_profile": 9473,
+ "conclusion": "Caret fine-tuning itself: +6.6 p.p. exact (B vs shipped). The context block: no gain (-0.95 p.p. with facts). Inspection: the correct member was often missing from the token-budgeted MEMBER list; METHOD/TYPE were excluded in v1.1."
+}

@@ -1,0 +1,32 @@
+{
+ "args": {
+  "engine": "/srv/flc/ctx/engine",
+  "vocab": "/srv/flc/ctx/engine/models/go-16384.bpe",
+  "lang": "go",
+  "hf_repo": "dvislobokov/go-ml-complation",
+  "prefix": "",
+  "split": "train",
+  "docs": 1050000,
+  "kinds": [],
+  "per_repo": 60,
+  "exclude": null,
+  "fix_dir": null,
+  "corpus_dir": "/srv/flc/engine-shards-go/src/data/corpus",
+  "deps_dir": "/srv/flc/finalize/go/deps",
+  "eval": false,
+  "out": "/srv/flc/finalize/go/caret/go-16384/train",
+  "workers": 100,
+  "seed": 20261009
+ },
+ "stats": {
+  "split_mismatch": 0,
+  "with_facts": 688610,
+  "with_deps": 773435,
+  "docs": 1207008,
+  "newline_in_completion": 82,
+  "no_file": 409,
+  "too_long": 1,
+  "tokens_ctx": 1209131841,
+  "tokens_noctx": 1149125097
+ }
+}

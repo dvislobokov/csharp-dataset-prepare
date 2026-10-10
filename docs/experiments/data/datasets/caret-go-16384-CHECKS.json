@@ -1,0 +1,86 @@
+{
+ "train": {
+  "noctx": {
+   "docs": 1050000,
+   "tokens": 1149125097,
+   "loss_tokens": 10556306,
+   "mean_doc_tokens": 1094.4,
+   "max_doc_tokens": 1793,
+   "completion_without_eot": 0,
+   "completion_with_newline": 0,
+   "completion_with_special": 0,
+   "prompt_layout_errors": 0
+  },
+  "ctx": {
+   "docs": 1050000,
+   "tokens": 1209131841,
+   "loss_tokens": 10556306,
+   "mean_doc_tokens": 1151.6,
+   "max_doc_tokens": 1956,
+   "completion_without_eot": 0,
+   "completion_with_newline": 0,
+   "completion_with_special": 0
+  },
+  "ctx_noctx_same_completions": true,
+  "meta": {
+   "split_mismatch": 0,
+   "with_facts": 688610,
+   "with_deps": 773435,
+   "docs": 1207008,
+   "newline_in_completion": 82,
+   "no_file": 409,
+   "too_long": 1,
+   "tokens_ctx": 1209131841,
+   "tokens_noctx": 1149125097
+  }
+ },
+ "eval": {
+  "positions": 12000,
+  "repos": 207,
+  "bad_targets": 0,
+  "prompt_over_context": 0,
+  "duplicate_ids": 0,
+  "with_facts": 9350,
+  "with_deps": 8999,
+  "by_kind": {
+   "after_keyword": 638,
+   "after_operator": 739,
+   "argument_list": 1488,
+   "composite_literal": 404,
+   "control_flow": 287,
+   "error_handling": 198,
+   "func_literal": 51,
+   "identifier_partial": 1644,
+   "line_start": 3376,
+   "log_message": 426,
+   "member_access": 2287,
+   "token_boundary": 462
+  }
+ },
+ "isolation": {
+  "train_corpus_repos": 43356,
+  "fresh_corpus_repos": 298,
+  "fresh_repos_in_train_corpus": 0,
+  "eval_position_repos_in_train": 0,
+  "examples": []
+ },
+ "examples": [
+  {
+   "doc": 281782,
+   "prompt_tail": "r] {\n\tif !s.hasState || !s.hasDefaultState {\n\t\tpanic(\"state machine is not properly initialised yet\")\n\t}\n\treturn s.sm\n}\n\nfunc (s *stateMachineBuilder[StateIdentifier]) RegisterState(\n\tstateID StateIdentifier,\n\taction StateAction[StateIdentifier],\n\ttransitions []StateIdentifier) StateMachineBuilder[StateIdentifier] {\n\n\t_, ok := s.sm.states[stateID]\n\tif ok {\n\t\tpanic(fmt.Sprintf(\"state %v is already registered\", stateID))\n\t}\n\n\ts.sm.states[stateID] = state[StateIdentifier]{\n\t\taction:      action,\n\t\ttransitions: makeTransitions(transitions),\n\t}\n\ts.hasState = true\n\n\treturn s\n}\n\nfunc makeTransitions[",
+   "completion": "StateIdentifier comparable](transitions []StateIdentifier) Transitions[StateIdentifier] {<|endoftext|>"
+  },
+  {
+   "doc": 132344,
+   "prompt_tail": "Sprintf(\"%s && %s\", pmInstall, pmBuild)\n\tbuild := exec.Command(\"sh\", \"-c\", buildCmdStr)\n\tbuild.Dir = filesAndFolder\n\tbuild.Stdout = os.Stdout\n\tbuild.Stderr = os.Stderr\n\tbuildErr := build.Run()\n\tbuildDur := time.Since(buildStart)\n\n\tbuildStatus := \"success\"\n\tif buildErr != nil {\n\t\tbuildStatus = \"failed\"\n\t\tutil.MetricsRegistry.BuildFailuresTotal.Inc()\n\t}\n\tutil.LogBuildEnd(logger, repo, buildDur, buildStatus, buildErr)\n\tutil.MetricsRegistry.BuildDurationSeconds.Observe(buildDur.Seconds())\n\n\tif deletedCount > 0 && buildStatus == \"success\" {\n\t\tutil.LogGitCommitStart(logger, repo)\n\t\tgitStart := time.",
+   "completion": "Now()<|endoftext|>"
+  },
+  {
+   "doc": 534918,
+   "prompt_tail": "files(t *testing.T) {\n\tif testing.Short() {\n\t\tt.Skip(\"skipping integration test\")\n\t}\n\tt.Parallel()\n\n\tclk := syntax.NewTIDClock(0)\n\n\tctx, cancel := context.WithCancel(context.Background())\n\tt.Cleanup(cancel)\n\tharness := testenv.StartHarness(ctx, t)\n\n\tapprovedFurry := harness.PDS.MustNewUser(t, \"approvedFurry.tpds\")\n\t_, err := harness.Store.CreateActor(ctx, store.CreateActorOpts{\n\t\tStatus: bffv1pb.ActorStatus_ACTOR_STATUS_APPROVED,<|reserved_1|>ARG t:*testing.T\nLOCAL approvedFurry:*testenv.TestUser cancel:context.CancelFunc clk ctx:context.Context harness:*testenv.Harness<|reserved_2|>\n\t\tDID:   ",
+   "completion": " approvedFurry.DID(),<|endoftext|>"
+  }
+ ],
+ "errors": [],
+ "ok": true
+}

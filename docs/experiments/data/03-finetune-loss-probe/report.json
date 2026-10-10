@@ -1,0 +1,16 @@
+{
+ "experiment": "03-finetune-loss-probe",
+ "date": "2026-10-10",
+ "question": "Why does the caret fine-tuning loss start at ~0.78 and then rise to ~1.07 (C#, lr 2e-4), while quality improves?",
+ "method": "completion-only loss of the language model BEFORE fine-tuning on 1 500-3 000 random training caret documents and on unseen eval-fresh positions, split into the <|endoftext|> stop token and the line tokens (tools: loss_probe.py on the H200 server)",
+ "results": {
+  "new C# language model": {"train_positions": {"all": 1.1658, "eot_token": 3.629, "line_tokens": 0.8945}, "unseen_positions": {"all": 1.2199, "eot_token": 3.868, "line_tokens": 0.9215}, "eot_share_of_loss_tokens": 0.10},
+  "shipped plugin model": {"train_positions": {"all": 1.1539, "eot_token": 3.205, "line_tokens": 0.9279}, "unseen_positions": {"all": 1.1862, "eot_token": 3.365, "line_tokens": 0.9407}}
+ },
+ "rejected_hypothesis": "memorisation of the training files (train vs unseen loss equal: 1.19 vs 1.19)",
+ "findings": [
+  "A language model trained on whole files never sees <|endoftext|> right after a line: loss 3.6 on 10 % of the completion tokens. The fine-tuning learns it in the first ~100 steps -> the loss drops to ~0.7.",
+  "With lr 2e-4 the loss then rises to ~1.07: the line tokens get worse (noisy gradients: ~300 loss tokens per step). lr 5e-5 keeps it at ~0.7 and gives +3.3 p.p. exact (experiment 04).",
+  "On line tokens the new language model is already better than the shipped one (0.92 vs 0.94 on unseen positions)."
+ ]
+}

@@ -1,0 +1,293 @@
+{
+ "positions": 12000,
+ "runs": {
+  "new:none": {
+   "n": 12000,
+   "exact": 0.5179,
+   "shown": 0.3722,
+   "precision": 0.9133
+  },
+  "new_base:none": {
+   "n": 12000,
+   "exact": 0.3597,
+   "shown": 0.2165,
+   "precision": 0.8229
+  },
+  "old:none": {
+   "n": 12000,
+   "exact": 0.3481,
+   "shown": 0.2147,
+   "precision": 0.8094
+  }
+ },
+ "by_kind": {
+  "new:none": {
+   "after_keyword": {
+    "n": 638,
+    "exact": 0.5596,
+    "shown": 0.3824,
+    "precision": 0.9098
+   },
+   "after_operator": {
+    "n": 739,
+    "exact": 0.5318,
+    "shown": 0.3532,
+    "precision": 0.9349
+   },
+   "argument_list": {
+    "n": 1488,
+    "exact": 0.584,
+    "shown": 0.4267,
+    "precision": 0.926
+   },
+   "composite_literal": {
+    "n": 404,
+    "exact": 0.3564,
+    "shown": 0.1708,
+    "precision": 0.8116
+   },
+   "control_flow": {
+    "n": 287,
+    "exact": 0.4774,
+    "shown": 0.23,
+    "precision": 0.8788
+   },
+   "error_handling": {
+    "n": 198,
+    "exact": 0.6061,
+    "shown": 0.4646,
+    "precision": 0.8913
+   },
+   "func_literal": {
+    "n": 51,
+    "exact": 0.7647,
+    "shown": 0.6471,
+    "precision": 1.0
+   },
+   "identifier_partial": {
+    "n": 1644,
+    "exact": 0.6442,
+    "shown": 0.4897,
+    "precision": 0.9491
+   },
+   "line_start": {
+    "n": 3376,
+    "exact": 0.4111,
+    "shown": 0.2405,
+    "precision": 0.9249
+   },
+   "log_message": {
+    "n": 426,
+    "exact": 0.2723,
+    "shown": 0.0822,
+    "precision": 0.8571
+   },
+   "member_access": {
+    "n": 2287,
+    "exact": 0.5715,
+    "shown": 0.5251,
+    "precision": 0.8759
+   },
+   "token_boundary": {
+    "n": 462,
+    "exact": 0.619,
+    "shown": 0.461,
+    "precision": 0.9343
+   }
+  },
+  "new_base:none": {
+   "after_keyword": {
+    "n": 638,
+    "exact": 0.0439,
+    "shown": 0.0313,
+    "precision": 0.25
+   },
+   "after_operator": {
+    "n": 739,
+    "exact": 0.0122,
+    "shown": 0.0054,
+    "precision": 0.0
+   },
+   "argument_list": {
+    "n": 1488,
+    "exact": 0.2776,
+    "shown": 0.1579,
+    "precision": 0.8511
+   },
+   "composite_literal": {
+    "n": 404,
+    "exact": 0.0421,
+    "shown": 0.2104,
+    "precision": 0.0588
+   },
+   "control_flow": {
+    "n": 287,
+    "exact": 0.0105,
+    "shown": 0.007,
+    "precision": 0.0
+   },
+   "error_handling": {
+    "n": 198,
+    "exact": 0.3283,
+    "shown": 0.1465,
+    "precision": 0.7931
+   },
+   "func_literal": {
+    "n": 51,
+    "exact": 0.1176,
+    "shown": 0.1373,
+    "precision": 0.4286
+   },
+   "identifier_partial": {
+    "n": 1644,
+    "exact": 0.6198,
+    "shown": 0.3066,
+    "precision": 0.9484
+   },
+   "line_start": {
+    "n": 3376,
+    "exact": 0.3454,
+    "shown": 0.1303,
+    "precision": 0.8523
+   },
+   "log_message": {
+    "n": 426,
+    "exact": 0.1408,
+    "shown": 0.2981,
+    "precision": 0.1654
+   },
+   "member_access": {
+    "n": 2287,
+    "exact": 0.5553,
+    "shown": 0.4381,
+    "precision": 0.8952
+   },
+   "token_boundary": {
+    "n": 462,
+    "exact": 0.5628,
+    "shown": 0.3095,
+    "precision": 0.9161
+   }
+  },
+  "old:none": {
+   "after_keyword": {
+    "n": 638,
+    "exact": 0.047,
+    "shown": 0.0596,
+    "precision": 0.1053
+   },
+   "after_operator": {
+    "n": 739,
+    "exact": 0.0149,
+    "shown": 0.0203,
+    "precision": 0.1333
+   },
+   "argument_list": {
+    "n": 1488,
+    "exact": 0.2614,
+    "shown": 0.1566,
+    "precision": 0.8326
+   },
+   "composite_literal": {
+    "n": 404,
+    "exact": 0.0322,
+    "shown": 0.1856,
+    "precision": 0.0667
+   },
+   "control_flow": {
+    "n": 287,
+    "exact": 0.0139,
+    "shown": 0.0035,
+    "precision": 0.0
+   },
+   "error_handling": {
+    "n": 198,
+    "exact": 0.3232,
+    "shown": 0.1465,
+    "precision": 0.7931
+   },
+   "func_literal": {
+    "n": 51,
+    "exact": 0.098,
+    "shown": 0.1373,
+    "precision": 0.4286
+   },
+   "identifier_partial": {
+    "n": 1644,
+    "exact": 0.6046,
+    "shown": 0.3266,
+    "precision": 0.9572
+   },
+   "line_start": {
+    "n": 3376,
+    "exact": 0.3303,
+    "shown": 0.1111,
+    "precision": 0.8187
+   },
+   "log_message": {
+    "n": 426,
+    "exact": 0.1268,
+    "shown": 0.3075,
+    "precision": 0.1374
+   },
+   "member_access": {
+    "n": 2287,
+    "exact": 0.5413,
+    "shown": 0.4316,
+    "precision": 0.8896
+   },
+   "token_boundary": {
+    "n": 462,
+    "exact": 0.5628,
+    "shown": 0.3203,
+    "precision": 0.9257
+   }
+  }
+ },
+ "paired": {
+  "new:none - new_base:none": {
+   "diff": 0.1583,
+   "ci95": [
+    0.1504,
+    0.166
+   ]
+  },
+  "new:none - old:none": {
+   "diff": 0.1698,
+   "ci95": [
+    0.1612,
+    0.1782
+   ]
+  },
+  "new_base:none - old:none": {
+   "diff": 0.0116,
+   "ci95": [
+    0.0064,
+    0.017
+   ]
+  }
+ },
+ "paired_on_positions_with_facts": {
+  "new:none - new_base:none": {
+   "diff": 0.1611,
+   "ci95": [
+    0.1519,
+    0.1706
+   ]
+  },
+  "new:none - old:none": {
+   "diff": 0.1733,
+   "ci95": [
+    0.1634,
+    0.1827
+   ]
+  },
+  "new_base:none - old:none": {
+   "diff": 0.0122,
+   "ci95": [
+    0.0062,
+    0.0178
+   ]
+  }
+ }
+}

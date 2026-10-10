@@ -1,0 +1,32 @@
+{
+ "args": {
+  "engine": "/srv/flc/ctx/engine",
+  "vocab": "/srv/flc/ctx/engine/models/cs-16384.bpe",
+  "lang": "csharp",
+  "hf_repo": "dvislobokov/csharp-ml-complation",
+  "prefix": "",
+  "split": "train",
+  "docs": 1050000,
+  "kinds": [],
+  "per_repo": 60,
+  "exclude": null,
+  "fix_dir": null,
+  "corpus_dir": "/srv/flc/engine-shards/src/data/corpus",
+  "deps_dir": "/srv/flc/finalize/csharp/deps",
+  "eval": false,
+  "out": "/srv/flc/finalize/csharp/caret/cs-16384/train",
+  "workers": 100,
+  "seed": 20261009
+ },
+ "stats": {
+  "split_mismatch": 0,
+  "with_facts": 766913,
+  "with_deps": 807138,
+  "docs": 1204894,
+  "no_file": 1110,
+  "newline_in_completion": 1495,
+  "too_long": 1,
+  "tokens_ctx": 1075483704,
+  "tokens_noctx": 1014527303
+ }
+}

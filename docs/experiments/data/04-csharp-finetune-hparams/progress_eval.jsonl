@@ -1,0 +1,13 @@
+{"model": "noctx5-4000", "step": 4000, "n": 2000, "exact": 0.386, "shown": 0.2555, "precision": 0.908}
+{"model": "ctx2-4000", "step": 4000, "n": 2000, "exact": 0.311, "shown": 0.187, "precision": 0.8663}
+{"model": "noctx5-8000", "step": 8000, "n": 2000, "exact": 0.4015, "shown": 0.2665, "precision": 0.8987}
+{"model": "noctx5-12000", "step": 12000, "n": 2000, "exact": 0.405, "shown": 0.263, "precision": 0.903}
+{"model": "lr1e4-mid", "step": 3000, "n": 2000, "exact": 0.3895, "shown": 0.251, "precision": 0.8964}
+{"model": "lr1e4-end", "step": 6000, "n": 2000, "exact": 0.413, "shown": 0.2585, "precision": 0.9149}
+{"model": "noctx5-16000", "step": 16000, "n": 2000, "exact": 0.416, "shown": 0.252, "precision": 0.9147}
+{"model": "lr2e5-mid", "step": 3000, "n": 2000, "exact": 0.405, "shown": 0.2745, "precision": 0.9053}
+{"model": "noctx5-20000", "step": 20000, "n": 2000, "exact": 0.4225, "shown": 0.2545, "precision": 0.9116}
+{"model": "lr2e5-end", "step": 6000, "n": 2000, "exact": 0.4145, "shown": 0.27, "precision": 0.913}
+{"model": "noctx5-24000", "step": 24000, "n": 2000, "exact": 0.431, "shown": 0.259, "precision": 0.9208}
+{"model": "noctx5-28000", "step": 28000, "n": 2000, "exact": 0.4275, "shown": 0.2625, "precision": 0.9181}
+{"model": "noctx5-32000", "step": 32000, "n": 2000, "exact": 0.4315, "shown": 0.2645, "precision": 0.9244}

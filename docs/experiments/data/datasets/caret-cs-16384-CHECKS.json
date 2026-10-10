@@ -1,0 +1,85 @@
+{
+ "train": {
+  "noctx": {
+   "docs": 1050000,
+   "tokens": 1014527303,
+   "loss_tokens": 10656595,
+   "mean_doc_tokens": 966.2,
+   "max_doc_tokens": 1912,
+   "completion_without_eot": 0,
+   "completion_with_newline": 0,
+   "completion_with_special": 0,
+   "prompt_layout_errors": 0
+  },
+  "ctx": {
+   "docs": 1050000,
+   "tokens": 1075483704,
+   "loss_tokens": 10656595,
+   "mean_doc_tokens": 1024.3,
+   "max_doc_tokens": 1962,
+   "completion_without_eot": 0,
+   "completion_with_newline": 0,
+   "completion_with_special": 0
+  },
+  "ctx_noctx_same_completions": true,
+  "meta": {
+   "split_mismatch": 0,
+   "with_facts": 766913,
+   "with_deps": 807138,
+   "docs": 1204894,
+   "no_file": 1110,
+   "newline_in_completion": 1495,
+   "too_long": 1,
+   "tokens_ctx": 1075483704,
+   "tokens_noctx": 1014527303
+  }
+ },
+ "eval": {
+  "positions": 12000,
+  "repos": 227,
+  "bad_targets": 0,
+  "prompt_over_context": 0,
+  "duplicate_ids": 0,
+  "with_facts": 10717,
+  "with_deps": 9504,
+  "by_kind": {
+   "after_keyword": 447,
+   "after_operator": 836,
+   "argument_list": 1260,
+   "control_flow": 301,
+   "identifier_partial": 2071,
+   "lambda_body": 67,
+   "line_start": 3929,
+   "linq": 197,
+   "log_message": 32,
+   "member_access": 2334,
+   "token_boundary": 526
+  }
+ },
+ "isolation": {
+  "train_corpus_repos": 29117,
+  "fresh_corpus_repos": 299,
+  "fresh_repos_in_train_corpus": 0,
+  "eval_position_repos_in_train": 0,
+  "examples": []
+ },
+ "examples": [
+  {
+   "doc": 281782,
+   "prompt_tail": "or2 _collisionsCreated:bool _flatness:float _gradient:Gradient _gradientDirty:bool _gradientTexture:Texture2D _height:int _heightCurve:Curve _indices:int[] _lacunarity:float _noise:FastNoiseLite _noiseFrequency:float _noiseMax:float _noiseMin:float _noiseOffsetX:float _noiseOffsetY:float _octaves:int _persistence:float _resolution:int _size:int _textureScale:float\nPROPERTY Flatness:float Gradient:Gradient Height:int HeightCurve:Curve Lacunarity:float Noise:FastNoiseLite NoiseFrequency:float NoiseMax:float NoiseMin:float NoiseOffsetX:float<|reserved_2|>\n            if (_noise != null && _noise.",
+   "completion": "IsConnected(\"changed\", Callable.From(UpdateMesh)))<|endoftext|>"
+  },
+  {
+   "doc": 132344,
+   "prompt_tail": "       }\n\n            if(dtpStartDate.Checked && dtpEndDate.Checked && dtpStartDate.Value > dtpEndDate.Value)\n            {\n                epErrors.SetError(dtpStartDate, \"Start date must be less than or equal to end date\");\n                e.Cancel = true;\n                tabInfo.SelectedTab = pgGeneral;\n                dtpStartDate.Focus();\n            }\n\n            if(!ucRequestStatus.ValidateItems())\n            {\n                tabInfo.SelectedTab = pgReqStats;<|reserved_1|>RET void\nARG e:CancelEventArgs sender:object\nFIELD timeZoneIdx:int<|reserved_2|>\n                ucRequestStatus.",
+   "completion": "Focus();<|endoftext|>"
+  },
+  {
+   "doc": 534918,
+   "prompt_tail": "s.ProcessName} - {process.MainWindowTitle}\");\n                        return process.MainWindowHandle;\n                    }\n                }\n            }\n            catch (Exception ex)\n            {<|reserved_1|>RET nint\nLOCAL ex:Exception\nCALL WriteLine(object value)->void @0 value:object | WriteLine(object value, string category)->void @0 value:object | WriteLine(string format, params object[] args)->void @0 format:string | WriteLine(string message)->void @0 message:string | WriteLine(string message, string category)->void @0 message:string<|reserved_2|>\n                Debug.WriteLine(",
+   "completion": "$\"Error finding test window: {ex.Message}\");<|endoftext|>"
+  }
+ ],
+ "errors": [],
+ "ok": true
+}
