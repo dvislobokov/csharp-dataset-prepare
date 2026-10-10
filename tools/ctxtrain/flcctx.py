@@ -88,6 +88,17 @@ def pretoken_boundary(tok: Tok, text: bytes, bol: int, cursor: int, eol: int, mo
     return last
 
 
+def heal_trailing_ws(text: bytes, bol: int, boundary: int) -> int:
+    """Healing v2 (2026-10-10, shared with ml-core healBoundary): when the line before the boundary ends with spaces/tabs after
+    code, the boundary moves back over them — the prompt ends at the code, the whitespace is typed text of the completion, so the
+    model writes `␠Word` (its own tokens) instead of a word without its space after a whitespace-only token. Indentation (only
+    whitespace between the line start and the boundary) is left alone."""
+    b = boundary
+    while b > bol and text[b - 1] in b" \t":
+        b -= 1
+    return b if b > bol else boundary
+
+
 def stable_tail(tok: Tok, ids: list[int], target: int, hard_cap: int) -> list[int]:
     """eval_inline.stable_tail (InlinePrompt.stableTail)."""
     if target <= 0 or len(ids) <= target:
@@ -286,7 +297,7 @@ def build(tok: Tok, text: bytes, caret: int, path: str, deps: list[int] | None =
     deps, facts = deps or [], facts or []
     bol = text.rfind(b"\n", 0, caret) + 1
     eol, _ = line_end(text, caret)
-    boundary = pretoken_boundary(tok, text, bol, caret, eol)
+    boundary = heal_trailing_ws(text, bol, pretoken_boundary(tok, text, bol, caret, eol))
     hdr = [tok.file_sep] + tok.encode(path.encode() + b"\n")
     a = max(0, boundary - 40000)
     if a > 0:
