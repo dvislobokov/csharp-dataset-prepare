@@ -62,6 +62,7 @@ def main():
     ap.add_argument("--max-steps", type=int, default=0)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--compile", action="store_true")
+    ap.add_argument("--save-every", type=int, default=4000, help="also keep ckpt-<step>.pt every N steps (0 = off)")
     a = ap.parse_args()
     import flcctx
     flcctx.engine_paths(a.engine)
@@ -106,6 +107,9 @@ def main():
         opt.step()
         opt.zero_grad(set_to_none=True)
         step += 1
+        if a.save_every and step % a.save_every == 0 and step < total:     # intermediate models for ckpt_eval_loop.sh
+            torch.save({"model": model.state_dict(), "config": model.config.to_dict(), "step": step, "tokens": tokens,
+                        "args": {**vars(a), "no_path": False}, "init_meta": meta}, os.path.join(a.out, f"ckpt-{step}.pt"))
         if step % 20 == 0 or step == total:
             row = {"step": step, "of": total, "loss": round(acc_loss / max(acc_n, 1), 4), "lr": lr, "tokens": tokens,
                    "tok_s": round(tokens / (time.time() - t0)), "elapsed_s": round(time.time() - t0)}

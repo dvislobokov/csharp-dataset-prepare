@@ -62,13 +62,14 @@ pe = f"{w}/progress_eval.jsonl"
 if os.path.exists(pe):
     rows = [json.loads(l) for l in open(pe) if l.strip()]
     ref = next((x for x in rows if x["model"] == "old"), None)
-    steps = [x for x in rows if x["model"] != "old"][-4:]
+    steps = [x for x in rows if x["model"] != "old"][-6:]
     if ref or steps:
         out.append("quality on clean positions (rest of line exact / shown / precision):")
     if ref:
         out.append(f"   old plugin model   {100 * ref['exact']:.1f} % / {100 * ref['shown']:.1f} % / {100 * ref['precision']:.1f} %")
     for x in steps:
-        out.append(f"   step {x['step']:>6,}        {100 * x['exact']:.1f} % / {100 * x['shown']:.1f} % / {100 * x['precision']:.1f} %")
+        label = ("fine-tune step" if x["model"].startswith("ft") else "language step") + f" {x['step']:,}"
+        out.append(f"   {label:<22}{100 * x['exact']:.1f} % / {100 * x['shown']:.1f} % / {100 * x['precision']:.1f} %")
 if stage == "eval":
     rs = [l for l in open(f"{w}/eval.log", errors="replace") if l.startswith("{\"run\"")] if os.path.exists(f"{w}/eval.log") else []
     out += [l.strip() for l in rs] or ["evaluating..."]

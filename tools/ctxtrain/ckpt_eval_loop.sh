@@ -2,7 +2,7 @@
 # Quality during training: every kept checkpoint (train.py --keep-every, runs/<run>/ckpt-<step>.pt) is evaluated on the
 # first $N clean eval positions (eval_ctx.py: rest-of-line exact, shown, precision at the plugin gate); the shipped plugin
 # model once as the reference. One line per checkpoint in $W/progress_eval.jsonl (watch_training.sh shows them).
-# Runs next to the training on the same GPU (~1 min per checkpoint). Stops when train_lang.sh has finished pretraining.
+# Runs next to the training on the same GPU (~1 min per checkpoint). Stops when train_lang.sh has finished the fine-tuning.
 #
 #   LANG_=go bash ckpt_eval_loop.sh
 set -uo pipefail
@@ -29,12 +29,16 @@ PY
 }
 [ -f "$W/peval/old.json" ] || evaluate old "$W/engine/models/$OLD" 0
 while true; do
-  for ck in $(ls "$W/runs/$RUN"/ckpt-[0-9]*.pt 2>/dev/null | sort -V); do
-    step=$(basename "$ck" .pt); step=${step#ckpt-}
-    [ -f "$W/peval/step$step.json" ] || [ -f "$W/peval/step$step.failed" ] && continue
-    sleep 30                                   # let train.py finish writing the file
-    evaluate "step$step" "$ck" "$step" || touch "$W/peval/step$step.failed"
+  # language model checkpoints (step<N>), then the caret fine-tuning ones (ft<N>); the final models are evaluated by train_lang.sh
+  for pair in "step:$W/runs/$RUN" "ft:$W/runs/$RUN-ft"; do
+    tag=${pair%%:*}; dir=${pair#*:}
+    for ck in $(ls "$dir"/ckpt-[0-9]*.pt 2>/dev/null | sort -V); do
+      step=$(basename "$ck" .pt); step=${step#ckpt-}
+      [ -f "$W/peval/$tag$step.json" ] || [ -f "$W/peval/$tag$step.failed" ] && continue
+      sleep 30                                 # let the trainer finish writing the file
+      evaluate "$tag$step" "$ck" "$step" || touch "$W/peval/$tag$step.failed"
+    done
   done
-  [ -f "$W/pretrain.done" ] && break
+  [ -f "$W/finetune.done" ] && break
   sleep 120
 done
