@@ -1,0 +1,20 @@
+<section id="eval" data-transition="fade" style="background:#ECE9E1;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#A8521A;letter-spacing:2px">ЧЕСТНАЯ ОЦЕНКА</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.1">Проверка на коде, которого никто не видел</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:center">
+<div style="display:flex;flex-direction:column;gap:8px;width:520px">
+<p style="font-size:200px;font-weight:700;line-height:1;color:#13202E">0</p>
+<p style="font-size:32px;line-height:1.35;color:#4A5563">общих репозиториев у обучения и проверки — проверено скриптом</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;gap:24px;align-items:baseline"><p style="font-size:44px;font-weight:700;width:220px;color:#A8521A">300</p><p style="font-size:30px;line-height:1.4">свежих репозиториев на язык (5–19 ★), отложены до обучения</p></div>
+<div style="display:flex;gap:24px;align-items:baseline"><p style="font-size:44px;font-weight:700;width:220px;color:#A8521A">4–5 %</p><p style="font-size:30px;line-height:1.4">файлов-почти-копий убраны из оценки (MinHash, Jaccard ≥ 0.8)</p></div>
+<div style="display:flex;gap:24px;align-items:baseline"><p style="font-size:44px;font-weight:700;width:220px;color:#A8521A">12 000</p><p style="font-size:30px;line-height:1.4">позиций, движок плагина как декодер, его порог показа</p></div>
+<div style="display:flex;gap:24px;align-items:baseline"><p style="font-size:44px;font-weight:700;width:220px;color:#A8521A">95 %</p><p style="font-size:30px;line-height:1.4">доверительный интервал: парный бутстрап на одних позициях</p></div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7684">6 · метрики: строка целиком · доля показанных подсказок · точность показанных</p>
+<aside>Оценка — самая важная часть. До обучения мы отложили по 300 свежих репозиториев на язык и исключили их отовсюду; скрипт проверяет, что общих репозиториев ноль. Дополнительно MinHash находит файлы-почти-копии — форки, вендоринг — это 4–5 процентов, их убираем из оценки. Дальше 12 тысяч позиций, и декодирует сам движок плагина с его правилом показа подсказки. Три метрики: угадана ли строка целиком, какую долю позиций плагин вообще показал и какая доля показанных верна. И все сравнения — парным бутстрапом на одних и тех же позициях, с доверительным интервалом. Иначе разницу в один процент от шума не отличить.</aside>
+</section>

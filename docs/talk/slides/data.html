@@ -1,0 +1,39 @@
+<section id="data" data-transition="fade" style="background:#F6F4EF;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#A8521A;letter-spacing:2px">ДАННЫЕ</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.1">Десятки тысяч репозиториев — без сборки кода</h2>
+</div>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#FFFFFF;border:1px solid #DAD6CC;border-radius:16px;padding:36px">
+<p style="font-size:24px;color:#4A5563">C#: репозитории</p>
+<p style="font-size:72px;font-weight:700;line-height:1.05">29 117</p>
+<p style="font-size:28px;color:#4A5563">6.47 млрд токенов</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#FFFFFF;border:1px solid #DAD6CC;border-radius:16px;padding:36px">
+<p style="font-size:24px;color:#4A5563">Go: репозитории</p>
+<p style="font-size:72px;font-weight:700;line-height:1.05">43 356</p>
+<p style="font-size:28px;color:#4A5563">10.42 млрд токенов</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#13202E;border-radius:16px;padding:36px">
+<p style="font-size:24px;color:#BFC8D2">позиции курсора</p>
+<p style="font-size:72px;font-weight:700;line-height:1.05;color:#E0782F">1.05 млн</p>
+<p style="font-size:28px;color:#BFC8D2">на язык, ~1 млрд токенов</p>
+</div>
+</div>
+<div style="display:flex;gap:40px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:32px;font-weight:600">Разбор, а не сборка</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Roslyn и go/types на снимке файла: ни restore, ни MSBuild, ни запуска чужого кода.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:32px;font-weight:600">Позиции по стратам</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">после точки, в аргументах, после return, начало строки… Точная реконструкция до байта.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:32px;font-weight:600">Гигиена</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">лицензии из allowlist, дедуп по хэшу, сгенерированный код и секреты — вон.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7684">5 · публичные датасеты HF: csharp-ml-complation, go-ml-complation · два CPU-сервера по 128 ядер, ~1 сутки</p>
+<aside>Данные. Мы собрали публичные репозитории GitHub: для C# — 29 тысяч, для Go — 43 тысячи, итого 6,5 и 10,4 миллиарда токенов для обучения языку. Важно, что мы ничего не собираем и не запускаем: Roslyn и go/types разбирают файл как есть, без restore и MSBuild — чужой код небезопасен. Из файлов мы делаем позиции курсора по стратам: после точки, внутри аргументов, после return, в начале строки — и проверяем, что префикс плюс ответ плюс суффикс восстанавливают файл до байта. Плюс лицензии, дедупликация, вычистка сгенерированного кода и секретов. На язык получилось около миллиона обучающих позиций — примерно миллиард токенов. Всё это собиралось на двух CPU-серверах примерно за сутки и лежит в открытых датасетах на Hugging Face.</aside>
+</section>

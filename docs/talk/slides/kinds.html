@@ -1,0 +1,25 @@
+<section id="kinds" data-transition="fade" style="background:#F6F4EF;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#A8521A;letter-spacing:2px">ГДЕ ВЫИГРЫШ · C# 50M</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.1">После ключевых слов и операторов — с нуля до половины</h2>
+</div>
+<div style="display:flex;gap:56px">
+<div style="flex:1;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">после return / new</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:43px;height:18px;background:#B9C2CC"></div><div style="width:586px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">4 → 49 %</p></div>
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">после оператора</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:8px;height:18px;background:#B9C2CC"></div><div style="width:572px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">1 → 48 %</p></div>
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">лямбды</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:18px;height:18px;background:#B9C2CC"></div><div style="width:538px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">2 → 45 %</p></div>
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">аргументы</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:342px;height:18px;background:#B9C2CC"></div><div style="width:577px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">29 → 48 %</p></div>
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">LINQ</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:347px;height:18px;background:#B9C2CC"></div><div style="width:487px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">29 → 41 %</p></div>
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">начало строки</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:308px;height:18px;background:#B9C2CC"></div><div style="width:386px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">26 → 32 %</p></div>
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">после точки</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:552px;height:18px;background:#B9C2CC"></div><div style="width:588px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">46 → 49 %</p></div>
+<div style="display:flex;align-items:center;gap:20px"><p style="font-size:26px;width:330px">недописанное имя</p><div style="display:flex;flex-direction:column;gap:4px"><div style="width:631px;height:18px;background:#B9C2CC"></div><div style="width:673px;height:18px;background:#E0782F"></div></div><p style="font-size:26px">53 → 56 %</p></div>
+</div>
+<div style="width:420px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:18px;background:#B9C2CC"></div><p style="font-size:26px">старая модель</p></div>
+<div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:18px;background:#E0782F"></div><p style="font-size:26px">новая 50M</p></div>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Старая модель почти не умела начинать выражение. После точки и в именах прирост скромный: там нужны знания о типах из других файлов.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7684">13 · строка целиком по типам позиции курсора, 12 000 позиций, промпты прежнего образца</p>
+<aside>Где именно выигрыш. Самое драматичное — позиции, где нужно начать выражение: после return или new, после оператора, в лямбдах. Старая модель там угадывала строку в 1–4 процентах случаев — почти никогда, а новая — почти в половине. Это прямой эффект дообучения на позициях курсора: старая модель училась продолжать файл, а не отвечать на вопрос «что дальше на этой строке». В аргументах — с 29 до 48. А вот после точки и в недописанных именах прирост скромный, 3 пункта: там решают знания о членах типов из других файлов, которых модель не видит. Это направление на будущее.</aside>
+</section>

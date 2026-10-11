@@ -1,0 +1,18 @@
+<section id="context" data-transition="fade" style="background:#F6F4EF;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#A8521A;letter-spacing:2px">ЭКСПЕРИМЕНТ 1 · КОНТЕКСТ</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.1">Факты о типах не помогли. Задача — помогла</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;align-items:center;gap:24px"><p style="font-size:28px;width:520px">Готовая модель плагина</p><div style="width:768px;height:52px;background:#B9C2CC;border-radius:6px"></div><p style="font-size:30px;font-weight:600">32.9 %</p></div>
+<div style="display:flex;align-items:center;gap:24px"><p style="font-size:28px;width:520px;font-weight:600">Дообучение на задаче, без контекста</p><div style="width:923px;height:52px;background:#E0782F;border-radius:6px"></div><p style="font-size:30px;font-weight:600">39.5 %</p></div>
+<div style="display:flex;align-items:center;gap:24px"><p style="font-size:28px;width:520px">С контекстом: только профиль</p><div style="width:912px;height:52px;background:#3B6FB6;border-radius:6px"></div><p style="font-size:30px;font-weight:600">39.1 %</p></div>
+<div style="display:flex;align-items:center;gap:24px"><p style="font-size:28px;width:520px">С контекстом: профиль + факты</p><div style="width:901px;height:52px;background:#3B6FB6;border-radius:6px"></div><p style="font-size:30px;font-weight:600">38.6 %</p></div>
+</div>
+<div style="display:flex;gap:40px">
+<p style="flex:1;font-size:30px;line-height:1.4"><b>+6.6 п.п.</b> — само дообучение на позициях курсора (95 %: +5.8…+7.4).</p>
+<p style="flex:1;font-size:30px;line-height:1.4"><b>−0.95 п.п.</b> — блок LOCAL / ARG / RECV / MEMBER: повторяет видимый код, а нужного члена в обрезанном списке часто нет.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7684">7 · C# 50M, 311 тыс. позиций, 2× RTX PRO 6000, ~1 ч · строка целиком, 12 000 позиций</p>
+<aside>Первый эксперимент был про контекст. Идея красивая: перед строкой дать модели факты от Roslyn — локальные переменные, параметры, члены типа после точки. Мы дообучили готовую модель в двух вариантах на одних и тех же позициях — с этим блоком и без. Результат: дообучение само по себе дало плюс 6,6 пункта, а блок контекста — минус один. Разбор показал почему: почти всё из блока модель и так видит в коде выше, а то, чего не видит, — например, нужный метод после точки — часто не помещалось в обрезанный список. Решение — плагин под контекст не дорабатываем, вкладываемся в данные и обучение. Это сэкономило недели работы над плагинами.</aside>
+</section>

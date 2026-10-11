@@ -1,0 +1,23 @@
+<section id="results" data-transition="fade" style="background:#ECE9E1;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#A8521A;letter-spacing:2px">РЕЗУЛЬТАТ · 50M, ТА ЖЕ СКОРОСТЬ</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.1">+11 п.п. для C#, +17 п.п. для Go</h2>
+</div>
+<div style="display:flex;gap:40px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#F6F4EF;border:1px solid #DAD6CC;border-radius:20px;padding:44px">
+<h3 style="font-size:40px;font-weight:600">C#</h3>
+<div style="display:flex;align-items:center;gap:16px"><div style="width:327px;height:40px;background:#B9C2CC;border-radius:6px"></div><p style="font-size:28px">старая 32.7 %</p></div>
+<div style="display:flex;align-items:center;gap:16px"><div style="width:438px;height:40px;background:#E0782F;border-radius:6px"></div><p style="font-size:28px;font-weight:600">новая 43.8 %</p></div>
+<p style="font-size:28px;line-height:1.5;color:#4A5563">показ 15.4 → 28.9 % (×1.9)<br>точность показанных 81.3 → 89.6 %</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#F6F4EF;border:1px solid #DAD6CC;border-radius:20px;padding:44px">
+<h3 style="font-size:40px;font-weight:600">Go</h3>
+<div style="display:flex;align-items:center;gap:16px"><div style="width:348px;height:40px;background:#B9C2CC;border-radius:6px"></div><p style="font-size:28px">старая 34.8 %</p></div>
+<div style="display:flex;align-items:center;gap:16px"><div style="width:518px;height:40px;background:#3B6FB6;border-radius:6px"></div><p style="font-size:28px;font-weight:600">новая 51.8 %</p></div>
+<p style="font-size:28px;line-height:1.5;color:#4A5563">показ 21.5 → 37.2 % (×1.7)<br>точность показанных 80.9 → 91.3 %</p>
+</div>
+</div>
+<p style="font-size:32px;line-height:1.4">Тот же размер, тот же движок, та же задержка: подсказок почти вдвое больше, а ошибок среди показанных — вдвое меньше.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7684">12 · строка целиком, 12 000 чистых позиций; C# +11.0 п.п. (95 %: +10.3…+11.8), Go +17.0 п.п. (+16.1…+17.8)</p>
+<aside>Итог для моделей того же размера, 50 миллионов. Обучение с нуля на своих данных плюс дообучение на задаче. C#: строк, угаданных целиком, было 32,7 процента, стало 43,8 — плюс 11 пунктов. Go: 34,8 стало 51,8 — плюс 17. Подсказка показывается почти вдвое чаще, и при этом точность показанных выше: из десяти показанных девять верны, у старых моделей — восемь. Самое важное — это при том же размере и той же скорости: плагину не нужно ничего, кроме нового файла модели. Обе модели уже в репозиториях плагинов.</aside>
+</section>
